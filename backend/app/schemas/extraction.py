@@ -50,10 +50,12 @@ class ExtractionResult(BaseModel):
     """
 
     product_name: ExtractedField = Field(default_factory=ExtractedField)
+    common_or_generic_name: ExtractedField = Field(default_factory=ExtractedField)
     manufacturer_name: ExtractedField = Field(default_factory=ExtractedField)
     manufacturer_address: ExtractedField = Field(default_factory=ExtractedField)
     packer_name: ExtractedField = Field(default_factory=ExtractedField)
     importer_name: ExtractedField = Field(default_factory=ExtractedField)
+    country_of_origin: ExtractedField = Field(default_factory=ExtractedField)
     net_quantity: ExtractedField = Field(default_factory=ExtractedField)
     mrp: ExtractedField = Field(default_factory=ExtractedField)
     month_year_of_manufacture: ExtractedField = Field(default_factory=ExtractedField)

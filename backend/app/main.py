@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend.app.core.config import get_settings
 from backend.app.api.extract import router as extract_router
+from backend.app.api.verify import router as verify_router
 
 settings = get_settings()
 
@@ -34,6 +35,7 @@ async def health_check():
 
 # Register API routers
 app.include_router(extract_router)
+app.include_router(verify_router)
 
 
 if __name__ == "__main__":

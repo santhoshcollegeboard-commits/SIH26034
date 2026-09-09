@@ -4,7 +4,7 @@ All tests mock the google-genai client — no real API calls or keys required.
 """
 
 import json
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -181,3 +181,22 @@ async def test_extract_handles_plain_string_fields(mock_client_cls):
     # Empty string should map to not_found
     assert result.net_quantity.value is None
     assert result.net_quantity.status == "not_found"
+
+
+@pytest.mark.asyncio
+@patch("backend.app.services.providers.gemini_provider.genai.Client")
+async def test_extract_native_async_client(mock_client_cls):
+    """Provider utilizes native async client when aio.models.generate_content is an async callable."""
+    mock_client = MagicMock()
+    mock_client.aio.models.generate_content = AsyncMock(
+        return_value=_make_mock_response(VALID_GEMINI_OUTPUT)
+    )
+    mock_client_cls.return_value = mock_client
+
+    provider = GeminiOCRProvider(api_key="test-key-not-real")
+    result = await provider.extract(b"\xff\xd8\xff\xe0" + b"\x00" * 50, "image/jpeg")
+
+    assert result.product_name.value == "Parle-G Biscuits"
+    assert result.product_name.status == "extracted"
+    mock_client.aio.models.generate_content.assert_awaited_once()
+
