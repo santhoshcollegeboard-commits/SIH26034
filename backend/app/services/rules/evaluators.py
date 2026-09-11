@@ -75,6 +75,31 @@ def _get_region(field: Optional[ExtractedField]) -> Optional[SourceRegion]:
     return field.source_region if field else None
 
 
+def _check_conflict(
+    field: Optional[ExtractedField],
+    rule_id: str,
+    rule_ref: str,
+    name: str,
+    expected_condition: str,
+    severity: RuleSeverity = RuleSeverity.CRITICAL,
+) -> Optional[RuleEvaluation]:
+    """If field has conflict status, return a NOT_VERIFIABLE RuleEvaluation."""
+    if field and field.status == "conflict":
+        details = field.conflict_details or field.value or "Conflicting declarations across panels"
+        return RuleEvaluation(
+            rule_id=rule_id,
+            rule_reference=rule_ref,
+            rule_name=name,
+            status=RuleStatus.NOT_VERIFIABLE,
+            severity=severity,
+            message=f"Conflicting declarations detected across package panels: {details}; inspector review required.",
+            extracted_value=field.value,
+            expected_condition=expected_condition,
+            source_region=_get_region(field),
+        )
+    return None
+
+
 def evaluate_product_name(
     result: ExtractionResult, metadata: Dict[str, Any]
 ) -> RuleEvaluation:
@@ -89,6 +114,23 @@ def evaluate_product_name(
     rule_id = "LM-PC-06-1-A"
     rule_ref = "Rule 6(1)(a), Legal Metrology (Packaged Commodities) Rules, 2011"
     name = "Product Name / Generic Identity Declaration"
+
+    # 0. Check multi-panel conflicts
+    conflict_ev = _check_conflict(
+        getattr(result, "common_or_generic_name", None),
+        rule_id,
+        rule_ref,
+        name,
+        "Common or generic commodity identity clearly declared.",
+    ) or _check_conflict(
+        result.product_name,
+        rule_id,
+        rule_ref,
+        name,
+        "Common or generic commodity identity clearly declared.",
+    )
+    if conflict_ev:
+        return conflict_ev
 
     # Prefer explicitly extracted generic / common name
     generic_val = _get_field_text(getattr(result, "common_or_generic_name", None))
@@ -183,6 +225,23 @@ def evaluate_manufacturer_details(
     rule_id = "LM-PC-06-1-B"
     rule_ref = "Rule 6(1)(b), Legal Metrology (Packaged Commodities) Rules, 2011"
     name = "Manufacturer / Packer / Importer Declaration"
+
+    # 0. Check multi-panel conflicts
+    for f in [
+        result.manufacturer_name,
+        result.manufacturer_address,
+        result.packer_name,
+        result.importer_name,
+    ]:
+        conflict_ev = _check_conflict(
+            f,
+            rule_id,
+            rule_ref,
+            name,
+            "Name and complete address of manufacturer/packer/importer must be declared.",
+        )
+        if conflict_ev:
+            return conflict_ev
 
     mfg_name = _get_field_text(result.manufacturer_name)
     mfg_addr = _get_field_text(result.manufacturer_address)
@@ -309,6 +368,23 @@ def evaluate_country_of_origin(
     rule_ref = "Rule 6(1)(b) Proviso & Rule 6(10), Legal Metrology (Packaged Commodities) Rules, 2011"
     name = "Country of Origin (Imported Commodities)"
 
+    # 0. Check multi-panel conflicts
+    conflict_ev = _check_conflict(
+        getattr(result, "country_of_origin", None),
+        rule_id,
+        rule_ref,
+        name,
+        "Country of origin must be stated for imported commodities.",
+    ) or _check_conflict(
+        result.importer_name,
+        rule_id,
+        rule_ref,
+        name,
+        "Country of origin must be stated for imported commodities.",
+    )
+    if conflict_ev:
+        return conflict_ev
+
     importer_name = _get_field_text(result.importer_name)
     origin_field_val = _get_field_text(getattr(result, "country_of_origin", None))
     mfg_addr = _get_field_text(result.manufacturer_address) or ""
@@ -408,6 +484,18 @@ def evaluate_net_quantity_presence(
     name = "Net Quantity Declaration Presence"
 
     field = result.net_quantity
+
+    # 0. Check multi-panel conflicts
+    conflict_ev = _check_conflict(
+        field,
+        rule_id,
+        rule_ref,
+        name,
+        "Net quantity declaration is mandatory on all packaged commodities.",
+    )
+    if conflict_ev:
+        return conflict_ev
+
     val = _get_field_text(field)
 
     if field.status == "unreadable":
@@ -464,6 +552,18 @@ def evaluate_standard_metric_units(
     name = "Standard Units & Quantity Formatting"
 
     field = result.net_quantity
+
+    # 0. Check multi-panel conflicts
+    conflict_ev = _check_conflict(
+        field,
+        rule_id,
+        rule_ref,
+        name,
+        "Net quantity must declare standard SI units (e.g., 'g', 'kg', 'ml', 'l').",
+    )
+    if conflict_ev:
+        return conflict_ev
+
     val = _get_field_text(field)
 
     if not val or field.status in ("not_found", "unreadable"):
@@ -552,6 +652,19 @@ def evaluate_manufacturing_date(
     name = "Month & Year of Manufacture / Packaging"
 
     field = result.month_year_of_manufacture
+
+    # 0. Check multi-panel conflicts
+    conflict_ev = _check_conflict(
+        field,
+        rule_id,
+        rule_ref,
+        name,
+        "Mandatory declaration of manufacturing or packaging month and year.",
+        severity=RuleSeverity.MAJOR,
+    )
+    if conflict_ev:
+        return conflict_ev
+
     val = _get_field_text(field)
 
     if field.status == "unreadable":
@@ -622,6 +735,18 @@ def evaluate_mrp_declaration(
     name = "Maximum Retail Price (MRP) & Tax Disclaimer"
 
     field = result.mrp
+
+    # 0. Check multi-panel conflicts
+    conflict_ev = _check_conflict(
+        field,
+        rule_id,
+        rule_ref,
+        name,
+        "Maximum Retail Price inclusive of all taxes must be declared.",
+    )
+    if conflict_ev:
+        return conflict_ev
+
     val = _get_field_text(field)
 
     if field.status == "unreadable":
@@ -721,6 +846,18 @@ def evaluate_consumer_care(
     name = "Consumer Care Grievance Redressal Details"
 
     field = result.consumer_care_details
+
+    # 0. Check multi-panel conflicts
+    conflict_ev = _check_conflict(
+        field,
+        rule_id,
+        rule_ref,
+        name,
+        "Mandatory contact info (toll-free/phone/email/address) for consumer grievances.",
+    )
+    if conflict_ev:
+        return conflict_ev
+
     val = _get_field_text(field)
 
     if field.status == "unreadable":
@@ -808,6 +945,18 @@ def evaluate_unit_sale_price(
     rule_id = "LM-PC-06-1-H-USP"
     rule_ref = "Rule 6(1)(h), Legal Metrology (Packaged Commodities) (Second Amendment) Rules, 2021"
     name = "Unit Sale Price (USP) Declaration"
+
+    # 0. Check multi-panel conflicts on net_quantity
+    conflict_ev = _check_conflict(
+        result.net_quantity,
+        rule_id,
+        rule_ref,
+        name,
+        "USP is mandatory on pre-packaged commodities (> 10 g / 10 ml).",
+        severity=RuleSeverity.MAJOR,
+    )
+    if conflict_ev:
+        return conflict_ev
 
     net_qty_str = _get_field_text(result.net_quantity)
 

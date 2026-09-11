@@ -4,9 +4,19 @@ import React, { useRef } from 'react';
  * Mobile-first Home / Landing Screen for PackCheck.
  * Directs users immediately into the package image capture/upload workflow.
  */
-export default function HomeScreen({ onSelectFile, recentChecks = [], onSelectRecent }) {
+export default function HomeScreen({ onSelectFiles, onSelectFile, recentChecks = [], onSelectRecent }) {
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null);
+
+  const handleFiles = (fileList) => {
+    if (!fileList || fileList.length === 0) return;
+    const files = Array.from(fileList);
+    if (onSelectFiles) {
+      onSelectFiles(files);
+    } else if (onSelectFile) {
+      onSelectFile(files[0]);
+    }
+  };
 
   const triggerFileUpload = () => {
     fileInputRef.current?.click();
@@ -26,15 +36,22 @@ export default function HomeScreen({ onSelectFile, recentChecks = [], onSelectRe
         accept="image/jpeg,image/png,image/webp"
         capture="environment"
         style={{ display: 'none' }}
-        onChange={(e) => onSelectFile(e.target.files?.[0])}
+        onChange={(e) => {
+          handleFiles(e.target.files);
+          e.target.value = '';
+        }}
         id="camera-input"
       />
       <input
         ref={fileInputRef}
         type="file"
         accept="image/jpeg,image/png,image/webp"
+        multiple
         style={{ display: 'none' }}
-        onChange={(e) => onSelectFile(e.target.files?.[0])}
+        onChange={(e) => {
+          handleFiles(e.target.files);
+          e.target.value = '';
+        }}
         id="upload-input"
       />
 

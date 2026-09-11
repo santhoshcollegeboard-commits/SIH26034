@@ -1,6 +1,7 @@
 """PackCheck schemas package."""
 
 from backend.app.schemas.extraction import (
+    CandidateField,
     SourceRegion,
     ExtractedField,
     ExtractionResult,
@@ -16,6 +17,7 @@ from backend.app.schemas.compliance import (
 )
 
 __all__ = [
+    "CandidateField",
     "SourceRegion",
     "ExtractedField",
     "ExtractionResult",

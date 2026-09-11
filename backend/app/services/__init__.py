@@ -8,6 +8,7 @@ from backend.app.services.interfaces import (
     ReportGenerator,
 )
 from backend.app.services.rules.engine import DeterministicRuleEngine
+from backend.app.services.aggregation import MultiPanelAggregator
 
 __all__ = [
     "OCRProvider",
@@ -16,6 +17,7 @@ __all__ = [
     "ImageQualityChecker",
     "RuleEngine",
     "DeterministicRuleEngine",
+    "MultiPanelAggregator",
     "EvidenceRepository",
     "ReportGenerator",
 ]

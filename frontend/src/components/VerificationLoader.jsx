@@ -5,21 +5,30 @@ import React, { useState, useEffect } from 'react';
  * Explains the two-stage pipeline (AI Vision Extraction -> Deterministic Rule Engine)
  * without faking artificial progress percentages.
  */
-export default function VerificationLoader({ previewUrl }) {
+export default function VerificationLoader({ previewUrl, previewUrls = [], panelCount }) {
+  const count = panelCount || (previewUrls && previewUrls.length) || (previewUrl ? 1 : 1);
+  const primaryThumb = previewUrl || (previewUrls && previewUrls[0]);
+
   const steps = [
     {
-      title: 'Reading packaging label...',
-      subtitle: 'Scanning visible declarations on Principal Display Panel',
+      title: count > 1 ? `Scanning ${count} package panels in parallel...` : 'Reading packaging label...',
+      subtitle:
+        count > 1
+          ? 'Dispatching concurrent OCR across all submitted package panels'
+          : 'Scanning visible declarations on Principal Display Panel',
       badge: 'AI Vision Proposer',
     },
     {
-      title: 'Extracting mandatory fields...',
-      subtitle: 'Isolating brand, generic name, MRP, net quantity & address',
-      badge: 'OCR Feature Extraction',
+      title: count > 1 ? 'Consolidating multi-panel evidence...' : 'Extracting mandatory fields...',
+      subtitle:
+        count > 1
+          ? 'Merging declarations across panels and checking for conflicts'
+          : 'Isolating brand, generic name, MRP, net quantity & address',
+      badge: 'Evidence Aggregation',
     },
     {
       title: 'Checking Legal Metrology rules...',
-      subtitle: 'Executing deterministic statutory compliance evaluators',
+      subtitle: 'Executing 9 deterministic statutory compliance evaluators once',
       badge: 'Deterministic Rule Engine',
     },
   ];
@@ -38,8 +47,8 @@ export default function VerificationLoader({ previewUrl }) {
     <div className="loader-container">
       {/* Visual Scanning Animation over package thumbnail */}
       <div className="scanner-frame">
-        {previewUrl ? (
-          <img src={previewUrl} alt="Package under inspection" className="scanner-preview" />
+        {primaryThumb ? (
+          <img src={primaryThumb} alt="Package under inspection" className="scanner-preview" />
         ) : (
           <div className="scanner-placeholder">📦</div>
         )}

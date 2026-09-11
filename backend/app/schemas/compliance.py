@@ -102,3 +102,12 @@ class VerificationResponse(BaseModel):
     processing_time_ms: Optional[int] = Field(
         None, description="Total pipeline execution time in milliseconds"
     )
+    image_count: Optional[int] = Field(
+        None, description="Total number of package images/panels processed"
+    )
+    panel_labels: Optional[List[str]] = Field(
+        None, description="Labels corresponding to processed panels (e.g., ['Front', 'Back'])"
+    )
+    per_image_extractions: Optional[List[ExtractionResult]] = Field(
+        None, description="Individual extraction results for each processed panel"
+    )

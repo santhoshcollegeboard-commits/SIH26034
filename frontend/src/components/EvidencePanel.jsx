@@ -43,6 +43,56 @@ export default function EvidencePanel({ evaluation, extractedField }) {
         )}
       </div>
 
+      {/* Conflict Alert Box if present */}
+      {extractedField?.status === 'conflict' && (
+        <div className="evidence-row conflict-alert-row">
+          <span className="evidence-label text-amber">Cross-Panel Conflict</span>
+          <div className="conflict-box">
+            <span className="conflict-icon">⚠️</span>
+            <div className="conflict-body">
+              <strong>Contradictory values across panels</strong>
+              <p>{extractedField.conflict_details || extractedField.value}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Source Panel Provenance */}
+      {(evaluation.source_region?.panel_label || extractedField?.source_panel_label) && (
+        <div className="evidence-row">
+          <span className="evidence-label">Source Panel</span>
+          <span className="panel-provenance-tag">
+            📌 {evaluation.source_region?.panel_label || extractedField?.source_panel_label}
+            {extractedField?.source_image_index !== undefined &&
+              extractedField?.source_image_index !== null && (
+                <span className="image-idx-text">
+                  {' '}(Image #{extractedField.source_image_index + 1})
+                </span>
+              )}
+          </span>
+        </div>
+      )}
+
+      {/* Multi-Panel Competing Candidates */}
+      {extractedField?.all_candidates && extractedField.all_candidates.length > 1 && (
+        <div className="evidence-row candidate-list-box">
+          <span className="evidence-label">Candidates Across Panels</span>
+          <div className="candidates-list">
+            {extractedField.all_candidates.map((cand, i) => (
+              <div key={i} className="candidate-row">
+                <span className="cand-panel-badge">
+                  {cand.source_panel_label || `Panel ${cand.source_image_index + 1}`}
+                </span>
+                <span className="cand-val">“{cand.value}”</span>
+                {cand.confidence !== null && cand.confidence !== undefined && (
+                  <span className="cand-conf">{Math.round(cand.confidence * 100)}%</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Confidence Score if available */}
       {confidence !== null && (
         <div className="evidence-row">

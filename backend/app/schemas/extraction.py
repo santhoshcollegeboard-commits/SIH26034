@@ -16,6 +16,22 @@ class SourceRegion(BaseModel):
     y: int = Field(..., description="Top edge of the bounding box in pixels")
     width: int = Field(..., description="Width of the bounding box in pixels")
     height: int = Field(..., description="Height of the bounding box in pixels")
+    image_index: Optional[int] = Field(
+        None, description="Index of the source image in the submitted images list"
+    )
+    panel_label: Optional[str] = Field(
+        None, description="Optional panel label, e.g. 'Front', 'Back', 'Side', 'Top', 'Bottom'"
+    )
+
+
+class CandidateField(BaseModel):
+    """A candidate extracted value from a specific package panel."""
+
+    value: Optional[str] = Field(None, description="Candidate text value")
+    confidence: Optional[float] = Field(None, description="Extraction confidence")
+    source_region: Optional[SourceRegion] = Field(None, description="Bounding box on panel")
+    source_image_index: Optional[int] = Field(None, description="Source image index")
+    source_panel_label: Optional[str] = Field(None, description="Source panel label")
 
 
 class ExtractedField(BaseModel):
@@ -25,6 +41,7 @@ class ExtractedField(BaseModel):
         'extracted' — value was successfully read from the image.
         'unreadable' — field region was found but value could not be read.
         'not_found' — field was not detected on the image at all.
+        'conflict' — multiple package panels proposed contradictory values.
     """
 
     value: Optional[str] = Field(
@@ -38,7 +55,19 @@ class ExtractedField(BaseModel):
     )
     status: str = Field(
         "not_found",
-        description="One of: 'extracted', 'unreadable', 'not_found'",
+        description="One of: 'extracted', 'unreadable', 'not_found', 'conflict'",
+    )
+    source_image_index: Optional[int] = Field(
+        None, description="Index of the image panel where this field was extracted"
+    )
+    source_panel_label: Optional[str] = Field(
+        None, description="Panel label where this field was extracted (e.g., 'Front', 'Back')"
+    )
+    all_candidates: Optional[list[CandidateField]] = Field(
+        None, description="All competing candidates extracted across panels"
+    )
+    conflict_details: Optional[str] = Field(
+        None, description="Explanatory text if conflicting declarations were detected across panels"
     )
 
 

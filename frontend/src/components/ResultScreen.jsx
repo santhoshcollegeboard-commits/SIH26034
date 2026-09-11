@@ -8,12 +8,20 @@ import ComplianceChecklist from './ComplianceChecklist';
 export default function ResultScreen({
   verificationResponse,
   previewUrl,
+  previewUrls = [],
+  panels = [],
   onReset,
 }) {
   const [activeTab, setActiveTab] = useState('RULES'); // 'RULES' | 'EXTRACTION'
 
-  const { compliance, extraction, processing_time_ms, model_used } =
-    verificationResponse || {};
+  const {
+    compliance,
+    extraction,
+    processing_time_ms,
+    model_used,
+    image_count,
+    panel_labels,
+  } = verificationResponse || {};
 
   const verdict = compliance?.overall_verdict || 'FLAGGED_FOR_REVIEW';
   const passedCount = compliance?.passed_count ?? 0;
@@ -22,14 +30,31 @@ export default function ResultScreen({
   const naCount = compliance?.not_applicable_count ?? 0;
   const totalRules = compliance?.evaluations?.length ?? 9;
 
+  // Build list of thumbnails with labels
+  const displayThumbnails =
+    panels && panels.length > 0
+      ? panels.map((p) => ({ url: p.previewUrl, label: p.panelLabel || 'Panel' }))
+      : previewUrls && previewUrls.length > 0
+      ? previewUrls.map((url, idx) => ({
+          url,
+          label: panel_labels?.[idx] || `Panel ${idx + 1}`,
+        }))
+      : previewUrl
+      ? [{ url: previewUrl, label: panel_labels?.[0] || 'PDP' }]
+      : [];
+
+  const effectivePanelCount = image_count || displayThumbnails.length || 1;
+
   // Verdict Banner Configurations
   const verdictConfigs = {
     PASS: {
       className: 'verdict-pass',
       icon: '🛡️',
       title: 'COMPLIANT',
-      subtitle: `All ${passedCount} applicable statutory declarations verified under Legal Metrology Rules, 2011.`,
-      actionHint: 'Package meets mandatory packaging standards on this panel.',
+      subtitle: `All ${passedCount} statutory declarations verified across ${effectivePanelCount} package ${
+        effectivePanelCount === 1 ? 'panel' : 'panels'
+      } under Legal Metrology Rules, 2011.`,
+      actionHint: 'Package meets mandatory packaging standards across submitted panels.',
     },
     FAIL: {
       className: 'verdict-fail',
@@ -42,8 +67,13 @@ export default function ResultScreen({
       className: 'verdict-review',
       icon: '🔍',
       title: 'REVIEW REQUIRED',
-      subtitle: `${reviewCount} declaration(s) unverified or not detected on this single packaging view.`,
-      actionHint: 'Human verification required to inspect other package panels (rear/side).',
+      subtitle: `${reviewCount} declaration(s) unverified or conflicting across ${effectivePanelCount} package ${
+        effectivePanelCount === 1 ? 'panel' : 'panels'
+      }.`,
+      actionHint:
+        effectivePanelCount > 1
+          ? 'Human verification required to inspect unverified declarations or resolve cross-panel conflicts.'
+          : 'Human verification required to inspect other package panels (rear/side).',
     },
   };
 
@@ -104,13 +134,22 @@ export default function ResultScreen({
             <span className="metric-lbl">Exempt</span>
           </div>
         )}
+        <div className="metric-cell cell-panels">
+          <span className="metric-val">{effectivePanelCount}</span>
+          <span className="metric-lbl">{effectivePanelCount === 1 ? 'Panel' : 'Panels'}</span>
+        </div>
       </section>
 
-      {/* 3. Package Thumbnail & Metadata Snapshot */}
+      {/* 3. Package Thumbnail & Multi-Panel Snapshot Strip */}
       <section className="package-snapshot-card">
-        {previewUrl && (
-          <div className="snapshot-thumb">
-            <img src={previewUrl} alt="Inspected package thumbnail" />
+        {displayThumbnails.length > 0 && (
+          <div className="snapshot-thumbs-strip">
+            {displayThumbnails.map((t, idx) => (
+              <div key={idx} className="snapshot-thumb-col">
+                <img src={t.url} alt={`${t.label} thumbnail`} className="multi-thumb-img" />
+                <span className="multi-thumb-pill">{t.label}</span>
+              </div>
+            ))}
           </div>
         )}
         <div className="snapshot-details">
@@ -127,6 +166,7 @@ export default function ResultScreen({
               </span>
             )}
           <div className="snapshot-meta-tags">
+            <span className="meta-tag">{effectivePanelCount} Panels Merged</span>
             {processing_time_ms && (
               <span className="meta-tag">{processing_time_ms} ms</span>
             )}
@@ -142,7 +182,9 @@ export default function ResultScreen({
           <div className="notice-text-col">
             <strong>Human Inspector Review Required</strong>
             <p>
-              Rule 6 statutory requirements not visible on this photo may be printed on the back or sides of the package.
+              {effectivePanelCount > 1
+                ? 'One or more statutory requirements were unreadable, missing, or contradictory across the submitted package panels.'
+                : 'Rule 6 statutory requirements not visible on this photo may be printed on the back or sides of the package.'}
             </p>
           </div>
         </div>
@@ -179,23 +221,48 @@ export default function ResultScreen({
       ) : (
         <div className="raw-extraction-list">
           <div className="raw-fields-header">
-            <h4>Raw Extracted Declarations</h4>
-            <span className="raw-fields-sub">Evidence proposed by AI/OCR</span>
+            <h4>Unified Extracted Declarations</h4>
+            <span className="raw-fields-sub">
+              Aggregated across {effectivePanelCount} package {effectivePanelCount === 1 ? 'panel' : 'panels'}
+            </span>
           </div>
           {rawFields.map(({ key, label }) => {
             const field = extraction?.[key] || {};
+            const isConflict = field.status === 'conflict';
             const isPresent = field.status === 'extracted' && field.value;
 
             return (
-              <div key={key} className={`raw-field-item ${isPresent ? '' : 'field-missing'}`}>
+              <div
+                key={key}
+                className={`raw-field-item ${
+                  isConflict ? 'field-conflict' : isPresent ? '' : 'field-missing'
+                }`}
+              >
                 <div className="field-label-col">
-                  <span className="field-title">{label}</span>
+                  <div className="field-title-row">
+                    <span className="field-title">{label}</span>
+                    {field.source_panel_label && (
+                      <span className="panel-tag-pill">📌 {field.source_panel_label}</span>
+                    )}
+                    {isConflict && <span className="conflict-tag-pill">CONFLICT</span>}
+                  </div>
                   <span className="field-key">`{key}`</span>
                 </div>
                 <div className="field-val-col">
-                  <span className="field-val-text">
-                    {field.value || <span className="text-muted">Not detected on this view</span>}
-                  </span>
+                  {isConflict ? (
+                    <div className="field-conflict-content">
+                      <span className="field-val-text conflict-val">{field.value}</span>
+                      <span className="conflict-hint">
+                        Inspector review required to confirm valid packaging declaration
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="field-val-text">
+                      {field.value || (
+                        <span className="text-muted">Not detected across submitted panels</span>
+                      )}
+                    </span>
+                  )}
                   {field.confidence !== undefined && field.confidence !== null && (
                     <span className="field-conf-tag">
                       {Math.round(field.confidence * 100)}% conf
