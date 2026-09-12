@@ -156,6 +156,18 @@ export default function ImagePreview({
                       <span className="stage-meta-dot">&bull;</span>
                       <span className="stage-filesize">{formatFileSize(activePanel.file?.size)}</span>
                     </div>
+
+                    {onRemovePanel && (
+                      <button
+                        type="button"
+                        className="stage-remove-btn"
+                        onClick={() => onRemovePanel(activePanel.id)}
+                        title="Remove this image"
+                        id="btn-remove-stage-image"
+                      >
+                        ✕ Remove Image
+                      </button>
+                    )}
                   </div>
 
                   <div className="stage-image-viewport">
@@ -207,7 +219,9 @@ export default function ImagePreview({
               <div className="pc-panels-manager-card">
                 <div className="manager-header">
                   <div className="manager-title-row">
-                    <h3 className="manager-title">Submitted Panels</h3>
+                    <h3 className="manager-title">
+                      {displayPanels.length > 1 ? 'Submitted Panels' : 'Panel Details'}
+                    </h3>
                     <span className="manager-count-tag">{displayPanels.length}</span>
                   </div>
 
@@ -223,71 +237,116 @@ export default function ImagePreview({
                   )}
                 </div>
 
-                {/* Compact List of Panels */}
-                <div className="pc-panel-items-list">
-                  {displayPanels.map((panel, idx) => {
-                    const isCurrent = panel.id === (activePanel?.id || displayPanels[0]?.id);
-                    return (
-                      <div
-                        key={panel.id || idx}
-                        className={`pc-panel-card-compact ${isCurrent ? 'is-active-card' : ''}`}
-                        onClick={() => setSelectedPanelId(panel.id)}
+                {/* When only 1 panel is selected, show details and controls without a duplicate image card */}
+                {displayPanels.length === 1 ? (
+                  <div className="pc-single-panel-config">
+                    <div className="compact-select-wrap">
+                      <label htmlFor="pc-select-single" className="single-panel-select-label">
+                        Panel Type:
+                      </label>
+                      <select
+                        id="pc-select-single"
+                        className="compact-panel-select"
+                        value={activePanel?.panelLabel || PANEL_OPTIONS[0]}
+                        onChange={(e) =>
+                          onUpdatePanelLabel && onUpdatePanelLabel(activePanel.id, e.target.value)
+                        }
+                        aria-label="Panel type"
                       >
-                        <div className="compact-thumb-wrap">
-                          <img
-                            src={panel.previewUrl}
-                            alt={`${panel.panelLabel} thumbnail`}
-                            className="compact-thumb-img"
-                          />
-                          <span className="compact-idx-chip">#{idx + 1}</span>
-                        </div>
+                        {PANEL_OPTIONS.map((opt) => (
+                          <option key={opt} value={opt}>
+                            {opt}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
 
-                        <div className="compact-details-col" onClick={(e) => e.stopPropagation()}>
-                          <div className="compact-select-wrap">
-                            <select
-                              id={`pc-select-${idx}`}
-                              className="compact-panel-select"
-                              value={panel.panelLabel || PANEL_OPTIONS[0]}
-                              onChange={(e) =>
-                                onUpdatePanelLabel && onUpdatePanelLabel(panel.id, e.target.value)
-                              }
-                              aria-label={`Panel ${idx + 1} type`}
+                    <div className="compact-meta-row">
+                      <span className="compact-filename" title={activePanel?.file?.name}>
+                        {formatTruncatedFilename(activePanel?.file?.name, 22)}
+                      </span>
+                      <span className="compact-meta-sep">&bull;</span>
+                      <span className="compact-filesize">{formatFileSize(activePanel?.file?.size)}</span>
+                    </div>
+
+                    {onRemovePanel && (
+                      <button
+                        type="button"
+                        className="pc-sidebar-remove-btn"
+                        onClick={() => onRemovePanel(activePanel.id)}
+                        id="btn-sidebar-remove-image"
+                      >
+                        🗑️ Remove Image
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  /* Compact List of Panels (only rendered when > 1 panel to avoid duplicate single preview) */
+                  <div className="pc-panel-items-list">
+                    {displayPanels.map((panel, idx) => {
+                      const isCurrent = panel.id === (activePanel?.id || displayPanels[0]?.id);
+                      return (
+                        <div
+                          key={panel.id || idx}
+                          className={`pc-panel-card-compact ${isCurrent ? 'is-active-card' : ''}`}
+                          onClick={() => setSelectedPanelId(panel.id)}
+                        >
+                          <div className="compact-thumb-wrap">
+                            <img
+                              src={panel.previewUrl}
+                              alt={`${panel.panelLabel} thumbnail`}
+                              className="compact-thumb-img"
+                            />
+                            <span className="compact-idx-chip">#{idx + 1}</span>
+                          </div>
+
+                          <div className="compact-details-col" onClick={(e) => e.stopPropagation()}>
+                            <div className="compact-select-wrap">
+                              <select
+                                id={`pc-select-${idx}`}
+                                className="compact-panel-select"
+                                value={panel.panelLabel || PANEL_OPTIONS[0]}
+                                onChange={(e) =>
+                                  onUpdatePanelLabel && onUpdatePanelLabel(panel.id, e.target.value)
+                                }
+                                aria-label={`Panel ${idx + 1} type`}
+                              >
+                                {PANEL_OPTIONS.map((opt) => (
+                                  <option key={opt} value={opt}>
+                                    {opt}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+
+                            <div className="compact-meta-row">
+                              <span className="compact-filename" title={panel.file?.name}>
+                                {formatTruncatedFilename(panel.file?.name, 15)}
+                              </span>
+                              <span className="compact-meta-sep">&bull;</span>
+                              <span className="compact-filesize">{formatFileSize(panel.file?.size)}</span>
+                            </div>
+                          </div>
+
+                          {onRemovePanel && (
+                            <button
+                              type="button"
+                              className="compact-remove-btn"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onRemovePanel(panel.id);
+                              }}
+                              title="Remove this panel"
+                              aria-label={`Remove panel ${idx + 1}`}
                             >
-                              {PANEL_OPTIONS.map((opt) => (
-                                <option key={opt} value={opt}>
-                                  {opt}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-
-                          <div className="compact-meta-row">
-                            <span className="compact-filename" title={panel.file?.name}>
-                              {formatTruncatedFilename(panel.file?.name, 15)}
-                            </span>
-                            <span className="compact-meta-sep">&bull;</span>
-                            <span className="compact-filesize">{formatFileSize(panel.file?.size)}</span>
-                          </div>
+                              ✕
+                            </button>
+                          )}
                         </div>
-
-                        {onRemovePanel && displayPanels.length > 1 && (
-                          <button
-                            type="button"
-                            className="compact-remove-btn"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onRemovePanel(panel.id);
-                            }}
-                            title="Remove this panel"
-                            aria-label={`Remove panel ${idx + 1}`}
-                          >
-                            ✕
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+                      );
+                    })}
+                  </div>
+                )}
 
                 {/* Quick Add Buttons */}
                 {displayPanels.length < 10 && (
@@ -376,13 +435,14 @@ export default function ImagePreview({
                   />
                   <span className="panel-number-chip">#{idx + 1}</span>
 
-                  {onRemovePanel && displayPanels.length > 1 && (
+                  {onRemovePanel && (
                     <button
                       type="button"
                       className="btn-remove-panel"
                       onClick={() => onRemovePanel(panel.id)}
                       title="Remove this panel"
                       aria-label={`Remove panel ${idx + 1}`}
+                      id={`btn-remove-panel-${idx}`}
                     >
                       ✕
                     </button>
@@ -416,6 +476,17 @@ export default function ImagePreview({
                     </span>
                     <span className="panel-size">{formatFileSize(panel.file?.size)}</span>
                   </div>
+
+                  {onRemovePanel && (
+                    <button
+                      type="button"
+                      className="btn-mobile-remove-image"
+                      onClick={() => onRemovePanel(panel.id)}
+                      id={`btn-mobile-remove-${idx}`}
+                    >
+                      🗑️ Remove Image
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
