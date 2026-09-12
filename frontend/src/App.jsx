@@ -6,6 +6,7 @@ import VerificationLoader from './components/VerificationLoader';
 import ResultScreen from './components/ResultScreen';
 import ErrorBanner from './components/ErrorBanner';
 import ExtractTest from './ExtractTest';
+import { useDeviceMode } from './hooks/useDeviceMode';
 
 const API_BASE = 'http://127.0.0.1:8000';
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024; // 10 MB per file
@@ -22,6 +23,7 @@ const DEFAULT_PANEL_LABELS = [
 ];
 
 export default function App() {
+  const { modePreference, setModePreference, effectiveMode, isPC, isMobile } = useDeviceMode();
   const [viewMode, setViewMode] = useState('VERIFY'); // 'VERIFY' | 'DEV_EXTRACT'
   const [screen, setScreen] = useState('HOME'); // 'HOME' | 'PREVIEW' | 'VERIFYING' | 'RESULT'
   const [panels, setPanels] = useState([]); // [{ id, file, previewUrl, panelLabel }]
@@ -261,6 +263,9 @@ export default function App() {
       viewMode={viewMode}
       onToggleViewMode={handleToggleViewMode}
       onResetToHome={handleResetToHome}
+      modePreference={modePreference}
+      effectiveMode={effectiveMode}
+      onSetModePreference={setModePreference}
     >
       {/* Dev Mode View: Preserved /api/extract component */}
       {viewMode === 'DEV_EXTRACT' ? (
@@ -275,7 +280,7 @@ export default function App() {
         </div>
       ) : (
         /* Primary Verification Workflow */
-        <div className="verify-flow-container">
+        <div className={`verify-flow-container mode-${effectiveMode.toLowerCase()}`}>
           {error && (
             <ErrorBanner
               error={error}
@@ -290,6 +295,9 @@ export default function App() {
               onSelectFile={handleSelectFile}
               recentChecks={recentChecks}
               onSelectRecent={handleSelectRecent}
+              isPC={isPC}
+              isMobile={isMobile}
+              effectiveMode={effectiveMode}
             />
           )}
 
@@ -301,6 +309,9 @@ export default function App() {
               onRemovePanel={handleRemovePanel}
               onUpdatePanelLabel={handleUpdatePanelLabel}
               onAddMoreFiles={handleAddMoreFiles}
+              isPC={isPC}
+              isMobile={isMobile}
+              effectiveMode={effectiveMode}
             />
           )}
 
@@ -309,6 +320,9 @@ export default function App() {
               previewUrl={panels[0]?.previewUrl}
               previewUrls={panels.map((p) => p.previewUrl)}
               panelCount={panels.length}
+              isPC={isPC}
+              isMobile={isMobile}
+              effectiveMode={effectiveMode}
             />
           )}
 
@@ -319,6 +333,9 @@ export default function App() {
               previewUrls={panels.map((p) => p.previewUrl)}
               panels={panels}
               onReset={handleResetToHome}
+              isPC={isPC}
+              isMobile={isMobile}
+              effectiveMode={effectiveMode}
             />
           )}
         </div>

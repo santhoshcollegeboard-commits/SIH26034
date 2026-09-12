@@ -1,9 +1,10 @@
 import React from 'react';
 
 /**
- * Mobile-first device shell.
- * Centers on desktop inside a premium mobile frame (~390-430px)
- * and fills 100% on mobile devices with appropriate safe area padding.
+ * Responsive device shell supporting both PC Workstation and Mobile views.
+ * - In PC mode: Expands up to full desktop width (1440px) with workstation header.
+ * - In Mobile mode: Centers inside a mobile device frame (~390-430px) with mobile topbar.
+ * - Provides mode switcher: [ Auto (PC/Mob) ] [ 💻 PC ] [ 📱 Mobile ]
  */
 export default function AppShell({
   children,
@@ -11,18 +12,82 @@ export default function AppShell({
   viewMode = 'VERIFY',
   onToggleViewMode,
   onResetToHome,
+  modePreference = 'AUTO',
+  effectiveMode = 'PC',
+  onSetModePreference,
 }) {
   return (
-    <div className="mobile-canvas">
-      <div className="mobile-frame" id="mobile-app-root">
-        {/* Mobile Header Bar */}
-        <header className="mobile-topbar">
+    <div
+      className={`app-canvas mobile-canvas mode-${effectiveMode.toLowerCase()}`}
+      data-device-mode={effectiveMode.toLowerCase()}
+      data-mode-pref={modePreference.toLowerCase()}
+    >
+      <div
+        className={`app-frame mobile-frame mode-${effectiveMode.toLowerCase()}`}
+        id="app-root"
+      >
+        {/* Responsive Header Bar */}
+        <header className="app-topbar mobile-topbar">
           <div className="topbar-left" onClick={onResetToHome} style={{ cursor: 'pointer' }}>
             <div className="brand-badge">
               <span className="brand-logo-icon">📦</span>
-              <h1 className="brand-title">PackCheck</h1>
+              <div className="brand-text-col">
+                <h1 className="brand-title">PackCheck</h1>
+                {effectiveMode === 'PC' && (
+                  <span className="brand-sub-title">Legal Metrology Compliance</span>
+                )}
+              </div>
             </div>
             <span className="brand-tag">SIH26034</span>
+          </div>
+
+          {/* Mode Switcher Control: AUTO | PC | MOBILE */}
+          <div className="topbar-center">
+            <div
+              className="mode-switcher"
+              role="radiogroup"
+              aria-label="Display layout mode"
+              id="mode-switcher"
+            >
+              <button
+                type="button"
+                className={`mode-btn ${modePreference === 'AUTO' ? 'active' : ''}`}
+                onClick={() => onSetModePreference && onSetModePreference('AUTO')}
+                title={`Automatic layout based on screen width (currently ${
+                  effectiveMode === 'PC' ? 'Desktop' : 'Mobile'
+                })`}
+                id="mode-btn-auto"
+                aria-checked={modePreference === 'AUTO'}
+                role="radio"
+              >
+                <span>Auto</span>
+                <span className="mode-sub-pill">
+                  {effectiveMode === 'PC' ? 'PC' : 'Mob'}
+                </span>
+              </button>
+              <button
+                type="button"
+                className={`mode-btn ${modePreference === 'PC' ? 'active' : ''}`}
+                onClick={() => onSetModePreference && onSetModePreference('PC')}
+                title="Force full-width PC workstation layout"
+                id="mode-btn-pc"
+                aria-checked={modePreference === 'PC'}
+                role="radio"
+              >
+                💻 <span className="mode-btn-label">PC</span>
+              </button>
+              <button
+                type="button"
+                className={`mode-btn ${modePreference === 'MOBILE' ? 'active' : ''}`}
+                onClick={() => onSetModePreference && onSetModePreference('MOBILE')}
+                title="Force mobile device layout"
+                id="mode-btn-mobile"
+                aria-checked={modePreference === 'MOBILE'}
+                role="radio"
+              >
+                📱 <span className="mode-btn-label">Mobile</span>
+              </button>
+            </div>
           </div>
 
           <div className="topbar-right">
@@ -54,8 +119,8 @@ export default function AppShell({
           </div>
         </header>
 
-        {/* Dynamic Mobile View Body */}
-        <main className="mobile-scrollable-body">{children}</main>
+        {/* Dynamic View Body */}
+        <main className="app-scrollable-body mobile-scrollable-body">{children}</main>
       </div>
     </div>
   );
