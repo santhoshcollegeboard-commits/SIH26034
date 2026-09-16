@@ -334,7 +334,7 @@ export default function ResultScreen({
                 className={`switch-btn ${activeTab === 'EXTRACTION' ? 'active' : ''}`}
                 onClick={() => setActiveTab('EXTRACTION')}
               >
-                Label Text ({rawFields.length})
+                Evidence & Extractions ({rawFields.length})
               </button>
             </div>
 
@@ -420,7 +420,7 @@ export default function ResultScreen({
               className={`switch-btn ${activeTab === 'EXTRACTION' ? 'active' : ''}`}
               onClick={() => setActiveTab('EXTRACTION')}
             >
-              Label Text ({rawFields.length})
+              Evidence & Extractions ({rawFields.length})
             </button>
           </div>
 

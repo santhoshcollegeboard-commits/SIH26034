@@ -49,7 +49,7 @@ For the given package image, extract these 11 fields:
 For EACH field, return a JSON object with:
 - "value": the extracted text exactly as printed, or null if not found/unreadable
 - "confidence": a float 0.0 to 1.0 indicating extraction confidence, or null if not found
-- "source_region": {"x": int, "y": int, "width": int, "height": int} approximate bounding box in pixels, or null if not found
+- "source_region": [ymin, xmin, ymax, xmax] approximate bounding box as normalized integers from 0 to 1000, or null if not found
 - "status": one of "extracted", "unreadable", or "not_found"
 
 CRITICAL RULES:
@@ -193,14 +193,16 @@ class GeminiOCRProvider(CloudOCRProvider):
             source_region_data = raw_field.get("source_region")
 
             source_region = None
-            if source_region_data and isinstance(source_region_data, dict):
+            if source_region_data and isinstance(source_region_data, list) and len(source_region_data) == 4:
                 try:
-                    source_region = SourceRegion(
-                        x=int(source_region_data.get("x", 0)),
-                        y=int(source_region_data.get("y", 0)),
-                        width=int(source_region_data.get("width", 0)),
-                        height=int(source_region_data.get("height", 0)),
-                    )
+                    ymin, xmin, ymax, xmax = [float(v) for v in source_region_data]
+                    if 0 <= ymin <= ymax <= 1000 and 0 <= xmin <= xmax <= 1000:
+                        source_region = SourceRegion(
+                            x=xmin / 1000.0,
+                            y=ymin / 1000.0,
+                            width=(xmax - xmin) / 1000.0,
+                            height=(ymax - ymin) / 1000.0,
+                        )
                 except (ValueError, TypeError):
                     source_region = None
 
