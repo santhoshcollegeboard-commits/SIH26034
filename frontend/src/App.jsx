@@ -88,7 +88,13 @@ export default function App() {
       if (p.previewUrl) URL.revokeObjectURL(p.previewUrl);
     });
 
-    const newPanels = filesArray.map((file, idx) => ({
+    // Deduplicate incoming files by name and size to ensure single entry per file
+    const uniqueFiles = filesArray.filter(
+      (file, index, self) =>
+        index === self.findIndex((f) => f.name === file.name && f.size === file.size)
+    );
+
+    const newPanels = uniqueFiles.map((file, idx) => ({
       id: `panel-${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${idx}`,
       file,
       previewUrl: URL.createObjectURL(file),
@@ -112,12 +118,19 @@ export default function App() {
     setError(null);
     const filesArray = Array.from(moreFiles);
 
-    if (panels.length + filesArray.length > MAX_PANELS) {
+    // Prevent adding duplicate files that already exist in panels
+    const nonDuplicateFiles = filesArray.filter(
+      (file) => !panels.some((p) => p.file.name === file.name && p.file.size === file.size)
+    );
+
+    if (nonDuplicateFiles.length === 0) return;
+
+    if (panels.length + nonDuplicateFiles.length > MAX_PANELS) {
       setError(`Cannot add more than ${MAX_PANELS} panels in total. Currently have ${panels.length}.`);
       return;
     }
 
-    for (const f of filesArray) {
+    for (const f of nonDuplicateFiles) {
       const valError = validateFile(f);
       if (valError) {
         setError(valError);
@@ -125,7 +138,7 @@ export default function App() {
       }
     }
 
-    const nextPanels = filesArray.map((file, idx) => {
+    const nextPanels = nonDuplicateFiles.map((file, idx) => {
       const totalIdx = panels.length + idx;
       return {
         id: `panel-${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${totalIdx}`,
@@ -147,6 +160,8 @@ export default function App() {
       }
       const filtered = prev.filter((p) => p.id !== panelId);
       if (filtered.length === 0) {
+        setVerificationResponse(null);
+        setError(null);
         setScreen('HOME');
       }
       return filtered;
