@@ -6,16 +6,11 @@ it does NOT decide compliance.
 """
 
 from typing import Optional
+# pyrefly: ignore [missing-import]
 from pydantic import BaseModel, Field
 
 
-class SourceRegion(BaseModel):
-    """Bounding box region on the source image where a field was detected."""
-
-    x: int = Field(..., description="Left edge of the bounding box in pixels")
-    y: int = Field(..., description="Top edge of the bounding box in pixels")
-    width: int = Field(..., description="Width of the bounding box in pixels")
-    height: int = Field(..., description="Height of the bounding box in pixels")
+from backend.app.schemas.common import SourceRegion
 
 
 class ExtractedField(BaseModel):
@@ -60,12 +55,22 @@ class ExtractionResult(BaseModel):
     consumer_care_details: ExtractedField = Field(default_factory=ExtractedField)
 
 
+from backend.app.schemas.compliance import InspectionResult
+from backend.app.schemas.quality import QualityAssessment
+
+
 class ExtractionResponse(BaseModel):
     """API response wrapper for the extraction endpoint."""
 
     success: bool = Field(..., description="Whether extraction completed without errors")
     result: Optional[ExtractionResult] = Field(
         None, description="Extracted fields, or null on error"
+    )
+    compliance: Optional[InspectionResult] = Field(
+        None, description="Deterministic statutory compliance evaluation result, or null on error"
+    )
+    quality: Optional[QualityAssessment] = Field(
+        None, description="Image quality assessment details from the pre-OCR quality gate"
     )
     error: Optional[str] = Field(None, description="Error message if extraction failed")
     model_used: Optional[str] = Field(
@@ -74,3 +79,4 @@ class ExtractionResponse(BaseModel):
     processing_time_ms: Optional[int] = Field(
         None, description="Total processing time in milliseconds"
     )
+

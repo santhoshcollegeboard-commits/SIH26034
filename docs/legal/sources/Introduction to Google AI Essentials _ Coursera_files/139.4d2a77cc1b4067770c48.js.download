@@ -1,0 +1,2 @@
+(window.webpackJsonp=window.webpackJsonp||[]).push([[139],{UAd1:function(module,n,e){"use strict";e.r(n);var a=e("wd/R"),o=e.n(a),t=e("zXDh");n.default=function(){o.a.locale(Object(t.getMomentLanguage)())}}}]);
+//# sourceMappingURL=139.4d2a77cc1b4067770c48.js.map

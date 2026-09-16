@@ -6,6 +6,7 @@ All tests mock the google-genai client — no real API calls or keys required.
 import json
 from unittest.mock import MagicMock, patch
 
+# pyrefly: ignore [missing-import]
 import pytest
 
 from backend.app.services.providers.gemini_provider import GeminiOCRProvider
