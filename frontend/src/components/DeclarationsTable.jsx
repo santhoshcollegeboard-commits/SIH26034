@@ -1,5 +1,3 @@
-import { useState } from 'react';
-import BoundingBoxOverlay from './BoundingBoxOverlay';
 import {
   MANDATORY_DECLARATIONS,
   NOT_AVAILABLE,
@@ -7,11 +5,9 @@ import {
   NOT_APPLICABLE,
   formatMissingValue,
   formatConfidence,
-  formatSourceRegion,
 } from '../services/formatters';
 
-export default function DeclarationsTable({ declarations, imageSrc }) {
-  const [selectedBbox, setSelectedBbox] = useState(null);
+export default function DeclarationsTable({ declarations }) {
 
   if (!declarations || (Array.isArray(declarations) && declarations.length === 0)) {
     return (
@@ -119,16 +115,11 @@ export default function DeclarationsTable({ declarations, imageSrc }) {
               <th>Observed Value</th>
               <th>Confidence</th>
               <th>Status</th>
-              <th>Source Bounding Box</th>
             </tr>
           </thead>
           <tbody>
             {items.map((item) => {
               const isMissing = item.value === NOT_AVAILABLE || item.value === NOT_RECORDED;
-              const hasCoords =
-                item.sourceRegion &&
-                typeof item.sourceRegion === 'object' &&
-                item.sourceRegion.x !== undefined;
 
               return (
                 <tr key={item.key} className={isMissing ? 'row-muted' : ''}>
@@ -140,43 +131,12 @@ export default function DeclarationsTable({ declarations, imageSrc }) {
                   </td>
                   <td className="conf-cell">{renderConfidence(item.confidence)}</td>
                   <td className="status-cell">{getStatusBadge(item.status)}</td>
-                  <td className="region-cell">
-                    {hasCoords ? (
-                      <button
-                        className="btn-inspect-region"
-                        onClick={() =>
-                          setSelectedBbox({
-                            fieldName: item.key,
-                            label: item.label,
-                            sourceRegion: item.sourceRegion,
-                            confidence: item.confidence,
-                          })
-                        }
-                        title="Inspect bounding box on image"
-                      >
-                        🔍 View Evidence
-                      </button>
-                    ) : (
-                      <span className="text-muted font-mono">{formatSourceRegion(item.sourceRegion)}</span>
-                    )}
-                  </td>
                 </tr>
               );
             })}
           </tbody>
         </table>
       </div>
-
-      {selectedBbox && (
-        <BoundingBoxOverlay
-          imageSrc={imageSrc}
-          fieldName={selectedBbox.fieldName}
-          label={selectedBbox.label}
-          sourceRegion={selectedBbox.sourceRegion}
-          confidence={selectedBbox.confidence}
-          onClose={() => setSelectedBbox(null)}
-        />
-      )}
     </div>
   );
 }

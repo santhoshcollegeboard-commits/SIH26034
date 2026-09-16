@@ -7,10 +7,6 @@ import React from 'react';
 export default function EvidencePanel({ evaluation, extractedField }) {
   if (!evaluation) return null;
 
-  const hasRegion = evaluation.source_region && (
-    evaluation.source_region.width > 0 || evaluation.source_region.height > 0
-  );
-
   const confidence = extractedField?.confidence ?? null;
 
   return (
@@ -117,16 +113,7 @@ export default function EvidencePanel({ evaluation, extractedField }) {
         </div>
       )}
 
-      {/* Bounding Box Source Region */}
-      {hasRegion && (
-        <div className="evidence-row">
-          <span className="evidence-label">Image Region (PDP)</span>
-          <span className="coords-chip">
-            x: {evaluation.source_region.x}, y: {evaluation.source_region.y} &bull;{' '}
-            {evaluation.source_region.width}&times;{evaluation.source_region.height}px
-          </span>
-        </div>
-      )}
+
 
       {/* Specific Evaluator Finding Message */}
       <div className="evidence-row finding-note">
