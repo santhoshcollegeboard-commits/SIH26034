@@ -24,7 +24,16 @@ from backend.app.schemas.extraction import (
     ExtractedField,
     SourceRegion,
 )
-from backend.app.services.interfaces.ocr import CloudOCRProvider
+from backend.app.services.interfaces.ocr import (
+    AuthenticationError,
+    CloudOCRProvider,
+    ModelNotFoundError,
+    ProviderQuotaExhaustedError,
+    ProviderTimeoutError,
+    ProviderUnavailableError,
+    RecoverableOCRError,
+)
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +70,7 @@ CRITICAL RULES:
 
 Return ONLY the JSON object with the 11 fields as keys. No extra commentary."""
 
-DEFAULT_MODEL = "gemini-flash-latest"
+DEFAULT_MODEL = "gemini-3.8-flash"
 
 
 class GeminiOCRProvider(CloudOCRProvider):
@@ -123,8 +132,66 @@ class GeminiOCRProvider(CloudOCRProvider):
                     ),
                 )
         except Exception as e:
-            logger.error("Gemini API call failed: %s", e)
-            raise RuntimeError(f"Gemini API call failed: {e}") from e
+            raw_msg = str(e)
+            clean_msg = re.sub(r"AIza[0-9A-Za-z_-]{35}", "***REDACTED***", raw_msg)
+            clean_msg = re.sub(r"key=[^&\s]+", "key=***REDACTED***", clean_msg)
+            logger.error("Gemini API call failed (%s): %s", self.model_name, clean_msg)
+
+            code = getattr(e, "code", None) or getattr(e, "status_code", None)
+            err_lower = raw_msg.lower()
+
+            if code == 429 or "resource_exhausted" in err_lower or "quota" in err_lower or "429" in err_lower:
+                raise ProviderQuotaExhaustedError(
+                    f"Gemini API call failed ({self.model_name}) - quota exhausted: {clean_msg}",
+                    provider="gemini",
+                    model=self.model_name,
+                ) from e
+
+            if code == 404 or "not found" in err_lower or "not_found" in err_lower:
+                raise ModelNotFoundError(
+                    f"Gemini API call failed ({self.model_name}) - model not found or unsupported: {clean_msg}",
+                    provider="gemini",
+                    model=self.model_name,
+                ) from e
+
+            if (
+                code in (500, 502, 503, 504)
+                or "unavailable" in err_lower
+                or "server error" in err_lower
+                or "bad gateway" in err_lower
+            ):
+                raise ProviderUnavailableError(
+                    f"Gemini API call failed ({self.model_name}) - service unavailable: {clean_msg}",
+                    provider="gemini",
+                    model=self.model_name,
+                ) from e
+
+            if isinstance(e, (asyncio.TimeoutError, TimeoutError)) or "timeout" in err_lower or "timed out" in err_lower:
+                raise ProviderTimeoutError(
+                    f"Gemini API call failed ({self.model_name}) - request timed out: {clean_msg}",
+                    provider="gemini",
+                    model=self.model_name,
+                ) from e
+
+            if (
+                code in (401, 403)
+                or "unauthenticated" in err_lower
+                or "api key not valid" in err_lower
+                or "permission_denied" in err_lower
+                or "forbidden" in err_lower
+            ):
+                raise AuthenticationError(
+                    f"Gemini API call failed ({self.model_name}) - authentication failed: {clean_msg}",
+                    provider="gemini",
+                    model=self.model_name,
+                ) from e
+
+            # Fallback for other errors (keeps "Gemini API call failed" for test matching)
+            raise RecoverableOCRError(
+                f"Gemini API call failed ({self.model_name}): {clean_msg}",
+                provider="gemini",
+                model=self.model_name,
+            ) from e
 
         # Parse the response text as JSON
         raw_text = response.text

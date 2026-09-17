@@ -8,6 +8,8 @@ from enum import Enum
 from typing import List, Optional
 from pydantic import BaseModel, Field
 
+from backend.app.schemas.barcode import BarcodeSummary
+from backend.app.schemas.gtin_identity import GTINIdentityVerification
 from backend.app.schemas.extraction import ExtractionResult, SourceRegion
 
 
@@ -110,4 +112,12 @@ class VerificationResponse(BaseModel):
     )
     per_image_extractions: Optional[List[ExtractionResult]] = Field(
         None, description="Individual extraction results for each processed panel"
+    )
+    barcode: Optional[BarcodeSummary] = Field(
+        None,
+        description="Decoded barcode(s) and local GTIN validation result (GTIN Phase 1)",
+    )
+    gtin_identity: Optional[GTINIdentityVerification] = Field(
+        None,
+        description="Authoritative GTIN product identity and OCR reconciliation result (GTIN Phase 2)",
     )

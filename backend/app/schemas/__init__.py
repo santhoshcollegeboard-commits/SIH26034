@@ -7,6 +7,13 @@ from backend.app.schemas.extraction import (
     ExtractionResult,
     ExtractionResponse,
 )
+from backend.app.schemas.barcode import (
+    BarcodeFormat,
+    GTINValidationStatus,
+    BarcodeDetectionStatus,
+    BarcodeItem,
+    BarcodeSummary,
+)
 from backend.app.schemas.compliance import (
     RuleStatus,
     RuleSeverity,
@@ -14,6 +21,15 @@ from backend.app.schemas.compliance import (
     RuleEvaluation,
     ComplianceResult,
     VerificationResponse,
+)
+
+from backend.app.schemas.gtin_identity import (
+    FieldMatchStatus,
+    IdentityVerificationStatus,
+    GTINLookupStatus,
+    GTINProductRecord,
+    FieldComparison,
+    GTINIdentityVerification,
 )
 
 __all__ = [
@@ -28,4 +44,15 @@ __all__ = [
     "RuleEvaluation",
     "ComplianceResult",
     "VerificationResponse",
+    "BarcodeFormat",
+    "GTINValidationStatus",
+    "BarcodeDetectionStatus",
+    "BarcodeItem",
+    "BarcodeSummary",
+    "FieldMatchStatus",
+    "IdentityVerificationStatus",
+    "GTINLookupStatus",
+    "GTINProductRecord",
+    "FieldComparison",
+    "GTINIdentityVerification",
 ]

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import ComplianceChecklist from './ComplianceChecklist';
+import GTINIdentityCard from './GTINIdentityCard';
 
 /**
  * Responsive Results Screen:
@@ -26,6 +27,8 @@ export default function ResultScreen({
     model_used,
     image_count,
     panel_labels,
+    barcode,
+    gtin_identity,
   } = verificationResponse || {};
 
   const verdict = compliance?.overall_verdict || 'FLAGGED_FOR_REVIEW';
@@ -316,6 +319,11 @@ export default function ResultScreen({
               </div>
             )}
 
+            {/* GTIN / Product Identity Verification */}
+            {(gtin_identity || barcode) && (
+              <GTINIdentityCard gtinIdentity={gtin_identity} barcode={barcode} />
+            )}
+
             {/* View Switcher (Statutory Rules vs Label Declarations) */}
             <div className="view-switch-row" role="tablist">
               <button
@@ -400,6 +408,11 @@ export default function ResultScreen({
                 </p>
               </div>
             </div>
+          )}
+
+          {/* GTIN / Product Identity Verification */}
+          {(gtin_identity || barcode) && (
+            <GTINIdentityCard gtinIdentity={gtin_identity} barcode={barcode} />
           )}
 
           {/* 5. View Switcher (Statutory Rules vs Label Declarations) */}
