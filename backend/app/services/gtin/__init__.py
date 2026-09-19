@@ -1,5 +1,6 @@
 """GTIN product identity and OCR reconciliation service package."""
 
+from backend.app.services.gtin.local_catalog_provider import LocalCatalogProvider
 from backend.app.services.gtin.providers import (
     DataKartAPIProvider,
     GTINProvider,
@@ -20,6 +21,7 @@ from backend.app.services.gtin.selector import (
 __all__ = [
     "GTINProvider",
     "LocalFixtureGTINProvider",
+    "LocalCatalogProvider",
     "DataKartAPIProvider",
     "get_gtin_provider",
     "set_gtin_provider",
@@ -29,3 +31,4 @@ __all__ = [
     "GTINSelectionResult",
     "select_gtin_candidate",
 ]
+

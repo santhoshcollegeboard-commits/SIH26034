@@ -26,7 +26,8 @@ export default function App() {
   const { modePreference, setModePreference, effectiveMode, isPC, isMobile } = useDeviceMode();
   const [viewMode, setViewMode] = useState('VERIFY'); // 'VERIFY' | 'DEV_EXTRACT'
   const [screen, setScreen] = useState('HOME'); // 'HOME' | 'PREVIEW' | 'VERIFYING' | 'RESULT'
-  const [panels, setPanels] = useState([]); // [{ id, file, previewUrl, panelLabel }]
+  const [panels, setPanels] = useState([]); // [{ id, file, previewUrl, panelLabel, productLabel }]
+  const [inspectionMode, setInspectionMode] = useState('MULTI_PRODUCT'); // 'MULTI_PRODUCT' | 'SINGLE_PRODUCT'
   const [verificationResponse, setVerificationResponse] = useState(null);
   const [error, setError] = useState(null);
   const [backendStatus, setBackendStatus] = useState('checking');
@@ -94,12 +95,16 @@ export default function App() {
         index === self.findIndex((f) => f.name === file.name && f.size === file.size)
     );
 
-    const newPanels = uniqueFiles.map((file, idx) => ({
-      id: `panel-${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${idx}`,
-      file,
-      previewUrl: URL.createObjectURL(file),
-      panelLabel: DEFAULT_PANEL_LABELS[Math.min(idx, DEFAULT_PANEL_LABELS.length - 1)],
-    }));
+    const newPanels = uniqueFiles.map((file, idx) => {
+      const cleanBase = file.name ? file.name.replace(/\.[^/.]+$/, '').trim() : '';
+      return {
+        id: `panel-${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${idx}`,
+        file,
+        previewUrl: URL.createObjectURL(file),
+        panelLabel: DEFAULT_PANEL_LABELS[Math.min(idx, DEFAULT_PANEL_LABELS.length - 1)],
+        productLabel: cleanBase || `Product ${idx + 1}`,
+      };
+    });
 
     setPanels(newPanels);
     setVerificationResponse(null);
@@ -111,22 +116,29 @@ export default function App() {
     if (file) handleSelectFiles([file]);
   };
 
-  // Add more panels while on Preview screen
+  // Add more panels or products while on Preview screen
   const handleAddMoreFiles = (moreFiles) => {
     if (!moreFiles || moreFiles.length === 0) return;
 
     setError(null);
     const filesArray = Array.from(moreFiles);
 
+    // Deduplicate incoming files within the batch first
+    const uniqueIncoming = filesArray.filter(
+      (file, index, self) =>
+        index === self.findIndex((f) => f.name === file.name && f.size === file.size)
+    );
+
     // Prevent adding duplicate files that already exist in panels
-    const nonDuplicateFiles = filesArray.filter(
+    const nonDuplicateFiles = uniqueIncoming.filter(
       (file) => !panels.some((p) => p.file.name === file.name && p.file.size === file.size)
     );
 
     if (nonDuplicateFiles.length === 0) return;
 
     if (panels.length + nonDuplicateFiles.length > MAX_PANELS) {
-      setError(`Cannot add more than ${MAX_PANELS} panels in total. Currently have ${panels.length}.`);
+      const itemType = inspectionMode === 'MULTI_PRODUCT' ? 'products' : 'panels';
+      setError(`Cannot add more than ${MAX_PANELS} ${itemType} in total. Currently have ${panels.length}.`);
       return;
     }
 
@@ -140,15 +152,20 @@ export default function App() {
 
     const nextPanels = nonDuplicateFiles.map((file, idx) => {
       const totalIdx = panels.length + idx;
+      const cleanBase = file.name ? file.name.replace(/\.[^/.]+$/, '').trim() : '';
       return {
         id: `panel-${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${totalIdx}`,
         file,
         previewUrl: URL.createObjectURL(file),
         panelLabel: DEFAULT_PANEL_LABELS[Math.min(totalIdx, DEFAULT_PANEL_LABELS.length - 1)],
+        productLabel: cleanBase || `Product ${totalIdx + 1}`,
       };
     });
 
     setPanels((prev) => [...prev, ...nextPanels]);
+    if (screen !== 'PREVIEW') {
+      setScreen('PREVIEW');
+    }
   };
 
   // Remove a single panel
@@ -175,7 +192,14 @@ export default function App() {
     );
   };
 
-  // Start verification API request across all package panels
+  // Update a product's label in multi-product mode
+  const handleUpdateProductLabel = (panelId, newLabel) => {
+    setPanels((prev) =>
+      prev.map((p) => (p.id === panelId ? { ...p, productLabel: newLabel } : p))
+    );
+  };
+
+  // Start verification API request across all package panels or multiple products
   const handleStartVerification = async () => {
     if (!panels || panels.length === 0) return;
 
@@ -184,12 +208,17 @@ export default function App() {
 
     try {
       const formData = new FormData();
-      panels.forEach((p) => {
+      const mode = inspectionMode === 'MULTI_PRODUCT' ? 'multi_product' : 'single_product';
+      formData.append('inspection_mode', mode);
+
+      panels.forEach((p, idx) => {
         formData.append('images', p.file);
-        formData.append('panel_labels', p.panelLabel || 'Panel');
+        if (mode === 'multi_product') {
+          formData.append('product_labels', p.productLabel || `Product ${idx + 1}`);
+        } else {
+          formData.append('panel_labels', p.panelLabel || `Panel ${idx + 1}`);
+        }
       });
-      // Backward compatibility: provide first image in 'image' field
-      formData.append('image', panels[0].file);
 
       const response = await fetch(`${API_BASE}/api/verify`, {
         method: 'POST',
@@ -215,10 +244,22 @@ export default function App() {
 
       // Add to recent checks
       const productName =
-        data.extraction?.common_or_generic_name?.value ||
-        data.extraction?.product_name?.value ||
-        panels[0].file.name;
-      const verdict = data.compliance?.overall_verdict || 'REVIEW';
+        (data.results && data.results.length > 1)
+          ? `${data.results.length} Products Inspection`
+          : data.results?.[0]?.product_name ||
+            data.extraction?.common_or_generic_name?.value ||
+            data.extraction?.product_name?.value ||
+            panels[0].file.name;
+
+      const verdict =
+        (data.results && data.results.length > 1)
+          ? (data.results.every((r) => r.compliance?.overall_verdict === 'PASS')
+              ? 'PASS'
+              : data.results.some((r) => r.compliance?.overall_verdict === 'FAIL')
+              ? 'FAIL'
+              : 'REVIEW')
+          : data.compliance?.overall_verdict || 'REVIEW';
+
       const newEntry = {
         id: Date.now(),
         productName,
@@ -229,6 +270,7 @@ export default function App() {
         panels: panels.map((p) => ({
           previewUrl: p.previewUrl,
           panelLabel: p.panelLabel,
+          productLabel: p.productLabel,
         })),
       };
       setRecentChecks((prev) => [newEntry, ...prev.slice(0, 4)]);
@@ -310,6 +352,8 @@ export default function App() {
               onSelectFile={handleSelectFile}
               recentChecks={recentChecks}
               onSelectRecent={handleSelectRecent}
+              inspectionMode={inspectionMode}
+              onSetInspectionMode={setInspectionMode}
               isPC={isPC}
               isMobile={isMobile}
               effectiveMode={effectiveMode}
@@ -323,7 +367,10 @@ export default function App() {
               onReset={handleResetToHome}
               onRemovePanel={handleRemovePanel}
               onUpdatePanelLabel={handleUpdatePanelLabel}
+              onUpdateProductLabel={handleUpdateProductLabel}
               onAddMoreFiles={handleAddMoreFiles}
+              inspectionMode={inspectionMode}
+              onSetInspectionMode={setInspectionMode}
               isPC={isPC}
               isMobile={isMobile}
               effectiveMode={effectiveMode}
@@ -348,6 +395,7 @@ export default function App() {
               previewUrls={panels.map((p) => p.previewUrl)}
               panels={panels}
               onReset={handleResetToHome}
+              inspectionMode={inspectionMode}
               isPC={isPC}
               isMobile={isMobile}
               effectiveMode={effectiveMode}

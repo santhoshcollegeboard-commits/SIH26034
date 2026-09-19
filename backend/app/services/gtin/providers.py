@@ -338,8 +338,11 @@ def get_gtin_provider() -> GTINProvider:
         return _gtin_provider
 
     settings = get_settings()
-    provider_name = getattr(settings, "GTIN_PROVIDER", "LOCAL_FIXTURE").upper()
-    if provider_name == "OPEN_FOOD_FACTS":
+    provider_name = getattr(settings, "GTIN_PROVIDER", "LOCAL_CATALOG").upper()
+    if provider_name == "LOCAL_CATALOG":
+        from backend.app.services.gtin.local_catalog_provider import LocalCatalogProvider
+        _gtin_provider = LocalCatalogProvider()
+    elif provider_name == "OPEN_FOOD_FACTS":
         _gtin_provider = OpenFoodFactsProvider(
             base_url=settings.OFF_API_BASE_URL,
             timeout=settings.OFF_TIMEOUT_SECONDS,
@@ -355,3 +358,12 @@ def set_gtin_provider(provider: Optional[GTINProvider]) -> None:
     """Override the global provider instance (used for testing and mock injection)."""
     global _gtin_provider
     _gtin_provider = provider
+
+
+# Expose LocalCatalogProvider for backward-compatible imports
+def __getattr__(name: str) -> Any:
+    if name == "LocalCatalogProvider":
+        from backend.app.services.gtin.local_catalog_provider import LocalCatalogProvider
+        return LocalCatalogProvider
+    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
+

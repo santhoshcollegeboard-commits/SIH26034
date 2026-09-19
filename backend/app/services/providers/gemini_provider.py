@@ -70,7 +70,7 @@ CRITICAL RULES:
 
 Return ONLY the JSON object with the 11 fields as keys. No extra commentary."""
 
-DEFAULT_MODEL = "gemini-3.8-flash"
+DEFAULT_MODEL = "gemini-3.6-flash"
 
 
 class GeminiOCRProvider(CloudOCRProvider):

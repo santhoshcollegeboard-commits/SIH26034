@@ -217,3 +217,165 @@ def test_verify_endpoint_single_image_backward_compatibility(mock_get_provider, 
     assert res_json["image_count"] == 1
     assert res_json["compliance"]["overall_verdict"] == OverallVerdict.PASS.value
 
+
+@patch("backend.app.api.extract.get_settings")
+@patch("backend.app.api.verify.get_ocr_provider")
+def test_verify_single_uploaded_image_produces_exactly_one_panel(mock_get_provider, mock_settings):
+    """Regression: 1 uploaded image produces exactly 1 panel with zero phantom panels or conflicts."""
+    mock_settings.return_value.GEMINI_API_KEY = "test-key"
+
+    extraction = ExtractionResult(
+        product_name=_make_field("MAGGI 2-Minute Noodles"),
+        common_or_generic_name=_make_field("Masala Noodles"),
+        net_quantity=_make_field("70 g"),
+        mrp=_make_field("₹ 15.00 (incl. of all taxes)"),
+        manufacturer_name=_make_field("Nestlé India Limited"),
+    )
+
+    mock_provider = AsyncMock()
+    mock_provider.extract.return_value = extraction
+    mock_provider.model_name = "mock-gemini"
+    mock_get_provider.return_value = mock_provider
+
+    files = [("images", ("maggi.jpg", io.BytesIO(DUMMY_JPEG), "image/jpeg"))]
+    data = {"panel_labels": ["Front Panel"]}
+
+    response = client.post("/api/verify", files=files, data=data)
+    assert response.status_code == 200
+    res = response.json()
+
+    # Exact count checks
+    assert res["image_count"] == 1
+    assert res["panel_labels"] == ["Front Panel"]
+    assert len(res["per_image_extractions"]) == 1
+
+    # Zero phantom panels or cross-panel conflicts
+    assert "Panel 2" not in res["panel_labels"]
+    assert res["extraction"]["product_name"]["status"] != "conflict"
+    assert res["extraction"]["net_quantity"]["status"] != "conflict"
+    assert "conflicting" not in (res["compliance"]["summary"] or "").lower()
+
+
+@patch("backend.app.api.extract.get_settings")
+@patch("backend.app.api.verify.get_ocr_provider")
+def test_verify_single_image_with_compat_field_does_not_duplicate_panel(mock_get_provider, mock_settings):
+    """Regression: If client redundantly sends both 'images' and 'image', 'images' takes precedence and 1 panel is created."""
+    mock_settings.return_value.GEMINI_API_KEY = "test-key"
+
+    extraction = ExtractionResult(
+        product_name=_make_field("MAGGI 2-Minute Noodles"),
+        net_quantity=_make_field("70 g"),
+    )
+
+    mock_provider = AsyncMock()
+    mock_provider.extract.return_value = extraction
+    mock_provider.model_name = "mock-gemini"
+    mock_get_provider.return_value = mock_provider
+
+    # Redundant payload: both 'images' and 'image' sent with same file
+    files = [
+        ("images", ("maggi.jpg", io.BytesIO(DUMMY_JPEG), "image/jpeg")),
+        ("image", ("maggi.jpg", io.BytesIO(DUMMY_JPEG), "image/jpeg")),
+    ]
+    data = {"panel_labels": ["Front Panel"]}
+
+    response = client.post("/api/verify", files=files, data=data)
+    assert response.status_code == 200
+    res = response.json()
+
+    assert res["image_count"] == 1
+    assert res["panel_labels"] == ["Front Panel"]
+    assert len(res["per_image_extractions"]) == 1
+    assert "Panel 2" not in res["panel_labels"]
+
+
+@patch("backend.app.api.extract.get_settings")
+@patch("backend.app.api.verify.get_ocr_provider")
+def test_verify_two_real_images_produce_exactly_two_panels(mock_get_provider, mock_settings):
+    """Regression: 2 distinct uploaded images produce exactly 2 panels."""
+    mock_settings.return_value.GEMINI_API_KEY = "test-key"
+
+    ext1 = ExtractionResult(product_name=_make_field("Brand Front"))
+    ext2 = ExtractionResult(mrp=_make_field("₹ 100.00"))
+
+    mock_provider = AsyncMock()
+    mock_provider.extract.side_effect = [ext1, ext2]
+    mock_provider.model_name = "mock-gemini"
+    mock_get_provider.return_value = mock_provider
+
+    files = [
+        ("images", ("panel_front.jpg", io.BytesIO(DUMMY_JPEG), "image/jpeg")),
+        ("images", ("panel_back.jpg", io.BytesIO(DUMMY_JPEG), "image/jpeg")),
+    ]
+    data = {"panel_labels": ["Front Panel", "Back Panel"]}
+
+    response = client.post("/api/verify", files=files, data=data)
+    assert response.status_code == 200
+    res = response.json()
+
+    assert res["image_count"] == 2
+    assert res["panel_labels"] == ["Front Panel", "Back Panel"]
+    assert len(res["per_image_extractions"]) == 2
+
+
+@patch("backend.app.api.extract.get_settings")
+@patch("backend.app.api.verify.get_ocr_provider")
+def test_verify_three_real_images_produce_exactly_three_panels(mock_get_provider, mock_settings):
+    """Regression: 3 distinct uploaded images produce exactly 3 panels."""
+    mock_settings.return_value.GEMINI_API_KEY = "test-key"
+
+    ext1 = ExtractionResult(product_name=_make_field("Brand Front"))
+    ext2 = ExtractionResult(mrp=_make_field("₹ 100.00"))
+    ext3 = ExtractionResult(net_quantity=_make_field("50 g"))
+
+    mock_provider = AsyncMock()
+    mock_provider.extract.side_effect = [ext1, ext2, ext3]
+    mock_provider.model_name = "mock-gemini"
+    mock_get_provider.return_value = mock_provider
+
+    files = [
+        ("images", ("front.jpg", io.BytesIO(DUMMY_JPEG), "image/jpeg")),
+        ("images", ("back.jpg", io.BytesIO(DUMMY_JPEG), "image/jpeg")),
+        ("images", ("side.jpg", io.BytesIO(DUMMY_JPEG), "image/jpeg")),
+    ]
+    data = {"panel_labels": ["Front Panel", "Back Panel", "Side Panel"]}
+
+    response = client.post("/api/verify", files=files, data=data)
+    assert response.status_code == 200
+    res = response.json()
+
+    assert res["image_count"] == 3
+    assert res["panel_labels"] == ["Front Panel", "Back Panel", "Side Panel"]
+    assert len(res["per_image_extractions"]) == 3
+
+
+@patch("backend.app.api.extract.get_settings")
+@patch("backend.app.api.verify.get_ocr_provider")
+def test_sequential_inspections_isolated_panel_count(mock_get_provider, mock_settings):
+    """Regression: Verifying 2 panels followed by 1 panel leaves no residual panels."""
+    mock_settings.return_value.GEMINI_API_KEY = "test-key"
+
+    ext = ExtractionResult(product_name=_make_field("Product"))
+
+    mock_provider = AsyncMock()
+    mock_provider.extract.return_value = ext
+    mock_provider.model_name = "mock-gemini"
+    mock_get_provider.return_value = mock_provider
+
+    # Request 1: 2 panels
+    files_2 = [
+        ("images", ("f1.jpg", io.BytesIO(DUMMY_JPEG), "image/jpeg")),
+        ("images", ("f2.jpg", io.BytesIO(DUMMY_JPEG), "image/jpeg")),
+    ]
+    res1 = client.post("/api/verify", files=files_2, data={"panel_labels": ["P1", "P2"]}).json()
+    assert res1["image_count"] == 2
+
+    # Request 2: 1 panel
+    files_1 = [
+        ("images", ("single.jpg", io.BytesIO(DUMMY_JPEG), "image/jpeg")),
+    ]
+    res2 = client.post("/api/verify", files=files_1, data={"panel_labels": ["Single Panel"]}).json()
+    assert res2["image_count"] == 1
+    assert res2["panel_labels"] == ["Single Panel"]
+
+

@@ -59,9 +59,18 @@ async def health_check():
     return {"status": "ok"}
 
 
+from pathlib import Path
+from fastapi.staticfiles import StaticFiles
+
 # Register API routers
 app.include_router(extract_router)
 app.include_router(verify_router)
+
+# Mount static evidence directory if present
+evidence_static_dir = Path(__file__).resolve().parents[2] / "frontend" / "public" / "evidence"
+if evidence_static_dir.exists():
+    app.mount("/evidence", StaticFiles(directory=str(evidence_static_dir)), name="evidence")
+
 
 
 if __name__ == "__main__":

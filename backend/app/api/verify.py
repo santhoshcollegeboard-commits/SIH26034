@@ -26,10 +26,12 @@ from backend.app.core.logging import (
     request_id_ctx,
 )
 from backend.app.schemas.barcode import BarcodeDetectionStatus
-from backend.app.schemas.compliance import VerificationResponse
+from backend.app.schemas.compliance import SingleProductResult, VerificationResponse
 from backend.app.schemas.extraction import ExtractionResult
+from backend.app.schemas.evidence import ProductEvidenceRecord
 from backend.app.services.aggregation import MultiPanelAggregator
 from backend.app.services.barcode import get_barcode_service
+from backend.app.services.evidence import get_evidence_service
 from backend.app.services.gtin import get_gtin_reconciler
 from backend.app.services.rules.engine import DeterministicRuleEngine
 
@@ -39,6 +41,218 @@ router = APIRouter(prefix="/api", tags=["verification"])
 
 # Reusable rule engine instance
 rule_engine = DeterministicRuleEngine()
+
+
+def _parse_form_list(raw_list: List[str]) -> List[str]:
+    """Parse string lists from multipart form-data (supporting JSON or comma-separated strings)."""
+    parsed: List[str] = []
+    if not raw_list:
+        return parsed
+    for item in raw_list:
+        item_str = str(item).strip()
+        if item_str.startswith("[") and item_str.endswith("]"):
+            try:
+                parsed.extend(json.loads(item_str))
+            except Exception:
+                parsed.append(item_str)
+        elif "," in item_str:
+            parsed.extend([p.strip() for p in item_str.split(",") if p.strip()])
+        elif item_str:
+            parsed.append(item_str)
+    return parsed
+
+
+async def verify_single_commodity(
+    validated_images: List[tuple[bytes, str, str]],
+    panel_labels: List[str],
+    provider,
+    rule_engine_inst: DeterministicRuleEngine,
+    product_id: str = "product_1",
+    product_name_hint: Optional[str] = None,
+    request_id: Optional[str] = None,
+) -> SingleProductResult:
+    """Execute the complete PackCheck compliance pipeline for ONE packaged commodity.
+
+    Completely isolated:
+    1. Per-panel OCR extraction
+    2. Multi-panel aggregation (for panels of this commodity)
+    3. Deterministic statutory rule evaluation
+    4. Barcode detection strictly on this commodity's images
+    5. GTIN identity reconciliation
+    6. Product evidence image lookup
+    """
+    start_time = time.monotonic()
+
+    # 1. Per-Image OCR Extraction (AI/OCR Proposer stage)
+    async def _safe_extract(img_bytes: bytes, mime: str, panel_num: int) -> ExtractionResult:
+        token_p = panel_idx_ctx.set(panel_num)
+        try:
+            return await provider.extract(img_bytes, mime)
+        finally:
+            panel_idx_ctx.reset(token_p)
+
+    tasks = [_safe_extract(data, mime, idx + 1) for idx, (data, mime, _) in enumerate(validated_images)]
+    extract_results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    successful_extractions: List[ExtractionResult] = []
+    successful_labels: List[str] = []
+    failed_panels: List[str] = []
+
+    for idx, res in enumerate(extract_results):
+        lbl = (
+            panel_labels[idx]
+            if idx < len(panel_labels)
+            else f"Panel {idx + 1}"
+        )
+        if isinstance(res, Exception):
+            logger.error("[%s] OCR error on %s: %s", product_id, lbl, res)
+            failed_panels.append(f"{lbl}: {res}")
+        elif isinstance(res, ExtractionResult):
+            successful_extractions.append(res)
+            successful_labels.append(lbl)
+
+    # If all panels for this product failed OCR, return isolated failure
+    if not successful_extractions:
+        first_err = str(extract_results[0]) if extract_results else "OCR failed on all panels."
+        elapsed_ms = int((time.monotonic() - start_time) * 1000)
+        return SingleProductResult(
+            product_id=product_id,
+            product_name=product_name_hint or f"Product {product_id}",
+            success=False,
+            error=f"OCR extraction failed: {first_err}",
+            model_used=getattr(provider, "model_name", None),
+            processing_time_ms=elapsed_ms,
+            image_count=len(validated_images),
+            panel_labels=panel_labels,
+        )
+
+    # 2. Aggregate extractions across panels of this commodity
+    unified_extraction = MultiPanelAggregator.aggregate(
+        extractions=successful_extractions,
+        panel_labels=successful_labels,
+    )
+
+    # 3. Deterministic Statutory Rule Evaluation (Decider stage)
+    package_metadata = {
+        "num_images": len(validated_images),
+        "panel_labels": successful_labels,
+        "failed_panels": failed_panels,
+    }
+    compliance_result = await rule_engine_inst.evaluate_compliance(
+        package_metadata=package_metadata,
+        extracted_declarations=unified_extraction,
+    )
+
+    if failed_panels and compliance_result.summary:
+        compliance_result.summary += (
+            f" [Note: {len(failed_panels)} panel(s) could not be parsed: {', '.join(failed_panels)}]"
+        )
+
+    # 4. Barcode Detection & Local GTIN Validation (GTIN Phase 1)
+    barcode_service = get_barcode_service()
+    try:
+        barcode_summary = barcode_service.process_package(validated_images)
+    except Exception as exc:
+        logger.error("[%s] Barcode processing error: %s", product_id, exc)
+        barcode_summary = None
+
+    if barcode_summary is not None and request_id:
+        try:
+            if barcode_summary.status == BarcodeDetectionStatus.NO_BARCODE_DETECTED:
+                log_barcode_event(
+                    event_type="NO_GTIN_DETECTED",
+                    message=f"[{product_id}] No barcode detected on package images",
+                    request_id=request_id,
+                )
+            elif not barcode_summary.is_valid_gtin:
+                invalid_item = next((b for b in barcode_summary.barcodes if not b.is_valid_gtin), None)
+                gtin_val = invalid_item.raw_value if invalid_item else barcode_summary.primary_gtin
+                log_barcode_event(
+                    event_type="INVALID_GTIN",
+                    gtin=gtin_val,
+                    message=f"[{product_id}] {barcode_summary.message}",
+                    request_id=request_id,
+                )
+            elif (
+                barcode_summary.status == BarcodeDetectionStatus.MULTIPLE_BARCODES_DETECTED
+                and barcode_summary.primary_gtin is None
+            ):
+                log_barcode_event(
+                    event_type="AMBIGUOUS_GTIN",
+                    message=f"[{product_id}] {barcode_summary.message}",
+                    request_id=request_id,
+                )
+            elif barcode_summary.primary_gtin:
+                log_barcode_event(
+                    event_type="GTIN_DETECTED",
+                    gtin=barcode_summary.primary_gtin,
+                    message=f"[{product_id}] {barcode_summary.message}",
+                    request_id=request_id,
+                )
+        except Exception as b_log_err:
+            logger.warning("[%s] Failed to log barcode event: %s", product_id, b_log_err)
+
+    # 5. GTIN Product Identity & OCR Reconciliation (GTIN Phase 2)
+    gtin_identity_result = None
+    if barcode_summary is not None:
+        reconciler = get_gtin_reconciler()
+        try:
+            gtin_identity_result = await reconciler.reconcile(
+                barcode_summary=barcode_summary,
+                extraction_result=unified_extraction,
+            )
+        except Exception as exc:
+            logger.error("[%s] GTIN identity reconciliation error: %s", product_id, exc)
+            gtin_identity_result = None
+
+    # 6. Product Evidence Image Lookup (Isolated Phase 3)
+    product_evidence_record = None
+    identified_gtin = None
+    if gtin_identity_result and gtin_identity_result.product_record and gtin_identity_result.product_record.gtin:
+        identified_gtin = gtin_identity_result.product_record.gtin
+    elif barcode_summary and barcode_summary.primary_gtin and barcode_summary.is_valid_gtin:
+        identified_gtin = barcode_summary.primary_gtin
+
+    if identified_gtin:
+        try:
+            evidence_service = get_evidence_service()
+            product_evidence_record = evidence_service.get_evidence(identified_gtin)
+        except Exception as exc:
+            logger.error("[%s] Product evidence lookup error: %s", product_id, exc)
+            product_evidence_record = None
+
+    elapsed_ms = int((time.monotonic() - start_time) * 1000)
+
+    # Determine resolved product name
+    resolved_name = None
+    if product_evidence_record and product_evidence_record.product_name:
+        resolved_name = product_evidence_record.product_name
+    elif gtin_identity_result and gtin_identity_result.product_record and gtin_identity_result.product_record.product_name:
+        resolved_name = gtin_identity_result.product_record.product_name
+    elif unified_extraction.product_name and unified_extraction.product_name.value:
+        resolved_name = unified_extraction.product_name.value
+    elif unified_extraction.common_or_generic_name and unified_extraction.common_or_generic_name.value:
+        resolved_name = unified_extraction.common_or_generic_name.value
+    elif product_name_hint:
+        resolved_name = product_name_hint
+
+    return SingleProductResult(
+        product_id=product_id,
+        product_name=resolved_name,
+        gtin=identified_gtin,
+        success=True,
+        extraction=unified_extraction,
+        compliance=compliance_result,
+        error=None,
+        model_used=getattr(provider, "model_name", None),
+        processing_time_ms=elapsed_ms,
+        image_count=len(validated_images),
+        panel_labels=successful_labels,
+        per_image_extractions=successful_extractions,
+        barcode=barcode_summary,
+        gtin_identity=gtin_identity_result,
+        product_evidence=product_evidence_record,
+    )
 
 
 @router.post("/verify", response_model=VerificationResponse)
@@ -52,20 +266,28 @@ async def verify_package(
     panel_labels: List[str] = Form(
         default=[], description="Optional labels for uploaded panels (e.g. ['Front', 'Back'])"
     ),
+    inspection_mode: Optional[str] = Form(
+        default=None, description="Inspection mode: 'single_product' or 'multi_product'"
+    ),
+    product_labels: List[str] = Form(
+        default=[], description="Optional labels/names for products in multi-product inspection"
+    ),
+    product_indices: List[str] = Form(
+        default=[], description="Optional grouping mapping each image to a product index"
+    ),
 ):
     """Verify package compliance against Legal Metrology (Packaged Commodities) Rules.
 
-    Supports single-image or multi-panel image verification.
-    When multiple panels of the same product are uploaded:
-    1. Each panel is processed concurrently via OCRProvider.
-    2. MultiPanelAggregator consolidates declarations, tracks panel origins, and detects conflicts.
-    3. DeterministicRuleEngine evaluates compliance once on the unified declarations.
+    Supports:
+    1. Single Product (Multi-Panel): Multiple panels of one package are aggregated into one report.
+    2. Multi-Product: Multiple distinct packaged commodities are inspected concurrently,
+       producing independent reports with isolated extractions, GTINs, rules, and evidence images.
     """
-    # 1. Collect all uploaded files
+    # 1. Collect all uploaded files (images takes precedence; image is legacy fallback)
     uploaded_files: List[UploadFile] = []
     if images:
         uploaded_files.extend(images)
-    if image:
+    elif image:
         uploaded_files.append(image)
 
     if not uploaded_files:
@@ -77,20 +299,10 @@ async def verify_package(
             detail=f"Too many images ({len(uploaded_files)}). Maximum allowed is 10 panels per package.",
         )
 
-    # Parse panel labels if provided
-    parsed_labels: List[str] = []
-    if panel_labels:
-        for item in panel_labels:
-            item_str = str(item).strip()
-            if item_str.startswith("[") and item_str.endswith("]"):
-                try:
-                    parsed_labels.extend(json.loads(item_str))
-                except Exception:
-                    parsed_labels.append(item_str)
-            elif "," in item_str:
-                parsed_labels.extend([p.strip() for p in item_str.split(",") if p.strip()])
-            elif item_str:
-                parsed_labels.append(item_str)
+    # Parse form lists
+    parsed_panel_labels = _parse_form_list(panel_labels)
+    parsed_product_labels = _parse_form_list(product_labels)
+    parsed_product_indices = _parse_form_list(product_indices)
 
     # 2. Validate all files
     validated_images: List[tuple[bytes, str, str]] = []
@@ -124,158 +336,155 @@ async def verify_package(
     provider = get_ocr_provider()
 
     try:
-        # 3. Concurrent Per-Image Extraction (AI/OCR Proposer stage)
-        async def _safe_extract(img_bytes: bytes, mime: str, panel_num: int) -> ExtractionResult:
-            token_p = panel_idx_ctx.set(panel_num)
-            try:
-                return await provider.extract(img_bytes, mime)
-            finally:
-                panel_idx_ctx.reset(token_p)
+        # Determine inspection mode
+        is_multi_product = inspection_mode == "multi_product"
 
-        tasks = [_safe_extract(data, mime, idx + 1) for idx, (data, mime, _) in enumerate(validated_images)]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+        if is_multi_product:
+            # Partition images by product
+            # If product_indices provided, group by index; otherwise each image is an independent product
+            product_groups: dict[int, List[int]] = {}
+            if parsed_product_indices:
+                for img_idx, p_idx_str in enumerate(parsed_product_indices):
+                    try:
+                        p_idx = int(p_idx_str)
+                    except ValueError:
+                        p_idx = img_idx
+                    product_groups.setdefault(p_idx, []).append(img_idx)
+            else:
+                for img_idx in range(len(validated_images)):
+                    product_groups[img_idx] = [img_idx]
 
-        successful_extractions: List[ExtractionResult] = []
-        successful_labels: List[str] = []
-        failed_panels: List[str] = []
+            # Execute independent commodity inspections concurrently
+            async def _run_single_prod(p_idx: int, img_indices: List[int]) -> SingleProductResult:
+                prod_images = [validated_images[i] for i in img_indices]
+                prod_labels = [
+                    parsed_panel_labels[i] if i < len(parsed_panel_labels) else f"Panel {i + 1}"
+                    for i in img_indices
+                ]
+                p_hint = (
+                    parsed_product_labels[p_idx]
+                    if p_idx < len(parsed_product_labels)
+                    else f"Product {p_idx + 1}"
+                )
+                prod_id = f"product_{p_idx + 1}"
+                try:
+                    return await verify_single_commodity(
+                        validated_images=prod_images,
+                        panel_labels=prod_labels,
+                        provider=provider,
+                        rule_engine_inst=rule_engine,
+                        product_id=prod_id,
+                        product_name_hint=p_hint,
+                        request_id=request_id,
+                    )
+                except Exception as exc:
+                    logger.error("Exception during independent verification of %s: %s", prod_id, exc)
+                    return SingleProductResult(
+                        product_id=prod_id,
+                        product_name=p_hint,
+                        success=False,
+                        error=f"Verification pipeline failed: {exc}",
+                        image_count=len(prod_images),
+                        panel_labels=prod_labels,
+                    )
 
-        for idx, res in enumerate(results):
-            lbl = (
-                parsed_labels[idx]
-                if idx < len(parsed_labels)
-                else f"Panel {idx + 1}"
-            )
-            if isinstance(res, Exception):
-                logger.error("OCR error on %s: %s", lbl, res)
-                failed_panels.append(f"{lbl}: {res}")
-            elif isinstance(res, ExtractionResult):
-                successful_extractions.append(res)
-                successful_labels.append(lbl)
+            # Sort product group keys to preserve ordering
+            sorted_p_keys = sorted(product_groups.keys())
+            prod_tasks = [_run_single_prod(k, product_groups[k]) for k in sorted_p_keys]
+            results = await asyncio.gather(*prod_tasks, return_exceptions=False)
 
-        # If all panels failed OCR, return provider error
-        if not successful_extractions:
-            first_err = str(results[0]) if results else "OCR failed on all panels."
-            duration_ms = int((time.monotonic() - start_time) * 1000)
+            elapsed_ms = int((time.monotonic() - start_time) * 1000)
+            overall_success = any(r.success for r in results)
+
+            primary = results[0] if results else None
             log_verify_complete(
                 request_id=request_id,
-                success=False,
-                duration_ms=duration_ms,
-                error=first_err,
+                success=overall_success,
+                duration_ms=elapsed_ms,
+                verdict=primary.compliance.overall_verdict if primary and primary.compliance else None,
             )
+
             return VerificationResponse(
-                success=False,
-                extraction=None,
-                compliance=None,
-                error=f"OCR extraction failed on all submitted images: {first_err}",
+                success=overall_success,
+                extraction=primary.extraction if primary else None,
+                compliance=primary.compliance if primary else None,
+                error=None if overall_success else (primary.error if primary else "All products failed"),
                 model_used=getattr(provider, "model_name", None),
-                processing_time_ms=duration_ms,
+                processing_time_ms=elapsed_ms,
                 image_count=len(uploaded_files),
-                panel_labels=parsed_labels if parsed_labels else None,
+                panel_labels=parsed_panel_labels if parsed_panel_labels else None,
+                per_image_extractions=primary.per_image_extractions if primary else None,
+                barcode=primary.barcode if primary else None,
+                gtin_identity=primary.gtin_identity if primary else None,
+                product_evidence=primary.product_evidence if primary else None,
+                inspection_mode="multi_product",
+                results=results,
             )
 
-        # 4. Aggregate extractions across panels (MultiPanelAggregator)
-        unified_extraction = MultiPanelAggregator.aggregate(
-            extractions=successful_extractions,
-            panel_labels=successful_labels,
-        )
-
-        # 5. Deterministic Statutory Rule Evaluation (Decider stage)
-        package_metadata = {
-            "num_images": len(uploaded_files),
-            "panel_labels": successful_labels,
-            "failed_panels": failed_panels,
-        }
-        compliance_result = await rule_engine.evaluate_compliance(
-            package_metadata=package_metadata,
-            extracted_declarations=unified_extraction,
-        )
-
-        # If any panel failed OCR but others succeeded, note it in compliance summary
-        if failed_panels and compliance_result.summary:
-            compliance_result.summary += (
-                f" [Note: {len(failed_panels)} panel(s) could not be parsed: {', '.join(failed_panels)}]"
+        else:
+            # Single Product (Multi-Panel): existing behavior preserved
+            single_result = await verify_single_commodity(
+                validated_images=validated_images,
+                panel_labels=parsed_panel_labels,
+                provider=provider,
+                rule_engine_inst=rule_engine,
+                product_id="product_1",
+                product_name_hint=parsed_product_labels[0] if parsed_product_labels else None,
+                request_id=request_id,
             )
 
-        # 6. Barcode Detection & Local GTIN Validation (GTIN Phase 1)
-        barcode_service = get_barcode_service()
-        try:
-            barcode_summary = barcode_service.process_package(validated_images)
-        except Exception as exc:
-            logger.error("Barcode processing error in verification pipeline: %s", exc)
-            barcode_summary = None
+            elapsed_ms = int((time.monotonic() - start_time) * 1000)
+            log_verify_complete(
+                request_id=request_id,
+                success=single_result.success,
+                duration_ms=elapsed_ms,
+                verdict=single_result.compliance.overall_verdict if single_result.compliance else None,
+            )
 
-        if barcode_summary is not None:
-            try:
-                if barcode_summary.status == BarcodeDetectionStatus.NO_BARCODE_DETECTED:
-                    log_barcode_event(
-                        event_type="NO_GTIN_DETECTED",
-                        message="No barcode detected on package images",
-                        request_id=request_id,
-                    )
-                elif not barcode_summary.is_valid_gtin:
-                    invalid_item = next((b for b in barcode_summary.barcodes if not b.is_valid_gtin), None)
-                    gtin_val = invalid_item.raw_value if invalid_item else barcode_summary.primary_gtin
-                    log_barcode_event(
-                        event_type="INVALID_GTIN",
-                        gtin=gtin_val,
-                        message=barcode_summary.message,
-                        request_id=request_id,
-                    )
-                elif (
-                    barcode_summary.status == BarcodeDetectionStatus.MULTIPLE_BARCODES_DETECTED
-                    and barcode_summary.primary_gtin is None
-                ):
-                    log_barcode_event(
-                        event_type="AMBIGUOUS_GTIN",
-                        message=barcode_summary.message,
-                        request_id=request_id,
-                    )
-                elif barcode_summary.primary_gtin:
-                    log_barcode_event(
-                        event_type="GTIN_DETECTED",
-                        gtin=barcode_summary.primary_gtin,
-                        message=barcode_summary.message,
-                        request_id=request_id,
-                    )
-            except Exception as b_log_err:
-                logger.warning("Failed to log barcode event: %s", b_log_err)
-
-        # 7. GTIN Product Identity & OCR Reconciliation (GTIN Phase 2)
-        gtin_identity_result = None
-        if barcode_summary is not None:
-            reconciler = get_gtin_reconciler()
-            try:
-                gtin_identity_result = await reconciler.reconcile(
-                    barcode_summary=barcode_summary,
-                    extraction_result=unified_extraction,
+            if not single_result.success:
+                return VerificationResponse(
+                    success=False,
+                    extraction=None,
+                    compliance=None,
+                    error=f"OCR extraction failed on all submitted images: {single_result.error}",
+                    model_used=single_result.model_used,
+                    processing_time_ms=elapsed_ms,
+                    image_count=len(uploaded_files),
+                    panel_labels=parsed_panel_labels if parsed_panel_labels else None,
+                    inspection_mode="single_product",
+                    results=[single_result],
                 )
-            except Exception as exc:
-                logger.error("GTIN identity reconciliation error in verification pipeline: %s", exc)
-                gtin_identity_result = None
 
-        elapsed_ms = int((time.monotonic() - start_time) * 1000)
-        log_verify_complete(
-            request_id=request_id,
-            success=True,
-            duration_ms=elapsed_ms,
-            verdict=compliance_result.overall_verdict if compliance_result else None,
-        )
+            return VerificationResponse(
+                success=True,
+                extraction=single_result.extraction,
+                compliance=single_result.compliance,
+                error=None,
+                model_used=single_result.model_used,
+                processing_time_ms=elapsed_ms,
+                image_count=single_result.image_count,
+                panel_labels=single_result.panel_labels,
+                per_image_extractions=single_result.per_image_extractions,
+                barcode=single_result.barcode,
+                gtin_identity=single_result.gtin_identity,
+                product_evidence=single_result.product_evidence,
+                inspection_mode="single_product",
+                results=[single_result],
+            )
 
-        return VerificationResponse(
-            success=True,
-            extraction=unified_extraction,
-            compliance=compliance_result,
-            error=None,
-            model_used=getattr(provider, "model_name", None),
-            processing_time_ms=elapsed_ms,
-            image_count=len(uploaded_files),
-            panel_labels=successful_labels,
-            per_image_extractions=successful_extractions,
-            barcode=barcode_summary,
-            gtin_identity=gtin_identity_result,
-        )
     except Exception as exc:
         log_backend_exception(exc, context="verify_pipeline", request_id=request_id)
         raise
     finally:
         request_id_ctx.reset(token_req)
+
+
+@router.get("/evidence/{gtin}", response_model=ProductEvidenceRecord)
+async def get_product_evidence(gtin: str):
+    """Retrieve matched product evidence image for a GTIN."""
+    evidence_service = get_evidence_service()
+    record = evidence_service.get_evidence(gtin)
+    if not record:
+        raise HTTPException(status_code=404, detail=f"No evidence record found for GTIN '{gtin}'.")
+    return record
+

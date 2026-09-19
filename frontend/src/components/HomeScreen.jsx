@@ -12,10 +12,13 @@ export default function HomeScreen({
   onSelectFile,
   recentChecks = [],
   onSelectRecent,
+  inspectionMode = 'MULTI_PRODUCT',
+  onSetInspectionMode,
   isPC = false,
 }) {
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null);
+  const dragCounterRef = useRef(0);
   const [isDragging, setIsDragging] = useState(false);
 
   const handleFiles = (fileList) => {
@@ -36,26 +39,45 @@ export default function HomeScreen({
     cameraInputRef.current?.click();
   };
 
+  const handleDragEnter = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current += 1;
+    if (e.dataTransfer?.items && e.dataTransfer.items.length > 0) {
+      setIsDragging(true);
+    }
+  };
+
   const handleDragOver = (e) => {
     e.preventDefault();
     e.stopPropagation();
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = 'copy';
+    }
     if (!isDragging) setIsDragging(true);
   };
 
   const handleDragLeave = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    setIsDragging(false);
+    dragCounterRef.current -= 1;
+    if (dragCounterRef.current <= 0) {
+      dragCounterRef.current = 0;
+      setIsDragging(false);
+    }
   };
 
   const handleDrop = (e) => {
     e.preventDefault();
     e.stopPropagation();
+    dragCounterRef.current = 0;
     setIsDragging(false);
     if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
       handleFiles(e.dataTransfer.files);
     }
   };
+
+  const isMultiProduct = inspectionMode === 'MULTI_PRODUCT';
 
   return (
     <div className={`home-screen ${isPC ? 'home-pc-layout' : 'home-mobile-layout'}`}>
@@ -100,16 +122,49 @@ export default function HomeScreen({
                 Automated Package Compliance Workstation
               </h2>
               <p className="home-hero-sub pc-hero-sub">
-                Ingest multiple package panels (Front, Back, Sides), extract statutory declarations via AI/OCR,
-                and verify compliance against India's Legal Metrology standards with deterministic legal evaluators.
+                {isMultiProduct
+                  ? 'Upload photos of multiple distinct products (e.g. Maggi, Cadbury, Dove). Each is inspected independently with its own GTIN reconciliation, statutory rules, and evidence image.'
+                  : "Ingest multiple package panels (Front, Back, Sides), extract statutory declarations via AI/OCR, and verify compliance against India's Legal Metrology standards."}
               </p>
+
+              {/* Inspection Mode Tabs Selector */}
+              <div className="inspection-mode-selector" role="tablist" aria-label="Inspection Mode">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={isMultiProduct}
+                  className={`mode-tab-btn ${isMultiProduct ? 'active' : ''}`}
+                  onClick={() => onSetInspectionMode && onSetInspectionMode('MULTI_PRODUCT')}
+                  id="btn-mode-multi-product"
+                >
+                  <span className="mode-tab-icon">📦</span>
+                  <div className="mode-tab-text">
+                    <span className="mode-tab-title">Multiple Products</span>
+                    <span className="mode-tab-sub">Independent Reports</span>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={!isMultiProduct}
+                  className={`mode-tab-btn ${!isMultiProduct ? 'active' : ''}`}
+                  onClick={() => onSetInspectionMode && onSetInspectionMode('SINGLE_PRODUCT')}
+                  id="btn-mode-single-product"
+                >
+                  <span className="mode-tab-icon">📄</span>
+                  <div className="mode-tab-text">
+                    <span className="mode-tab-title">Single Product</span>
+                    <span className="mode-tab-sub">Multi-Panel Aggregation</span>
+                  </div>
+                </button>
+              </div>
             </section>
 
             {/* Large Drag-and-Drop Dropzone for Desktop */}
             <section
               className={`pc-dropzone-card ${isDragging ? 'is-dragging' : ''}`}
               onDragOver={handleDragOver}
-              onDragEnter={handleDragOver}
+              onDragEnter={handleDragEnter}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
               onClick={triggerFileUpload}
@@ -125,13 +180,19 @@ export default function HomeScreen({
             >
               <div className="pc-dropzone-content">
                 <div className="pc-dropzone-icon">
-                  {isDragging ? '📂' : '📥'}
+                  {isDragging ? '📂' : isMultiProduct ? '📦' : '📥'}
                 </div>
                 <h3 className="pc-dropzone-title">
-                  {isDragging ? 'Drop Package Images to Upload' : 'Drag & Drop Package Images Here'}
+                  {isDragging
+                    ? 'Drop Package Images to Upload'
+                    : isMultiProduct
+                    ? 'Drag & Drop Multiple Product Photos Here'
+                    : 'Drag & Drop Package Images Here'}
                 </h3>
                 <p className="pc-dropzone-hint">
-                  Drop single or multiple panels (Front, Back, Sides, Bottom) or browse from your computer
+                  {isMultiProduct
+                    ? 'Upload photos of different products (e.g. Maggi, Cadbury, Dove) for independent inspection'
+                    : 'Drop single or multiple panels (Front, Back, Sides, Bottom) of the same package or browse'}
                 </p>
 
                 <div className="pc-dropzone-actions" onClick={(e) => e.stopPropagation()}>
@@ -142,7 +203,7 @@ export default function HomeScreen({
                     id="btn-pc-browse"
                   >
                     <span className="btn-icon">📁</span>
-                    <span>Browse Package Images</span>
+                    <span>{isMultiProduct ? 'Browse Product Images' : 'Browse Package Images'}</span>
                   </button>
 
                   <button
@@ -271,8 +332,36 @@ export default function HomeScreen({
 
             <h2 className="home-hero-title">Automated Package Compliance</h2>
             <p className="home-hero-sub">
-              Check packaged commodity labels against mandatory statutory declarations with deterministic Legal Metrology rules.
+              {isMultiProduct
+                ? 'Inspect multiple distinct products in one session. Each product gets an independent report.'
+                : 'Check packaged commodity labels against mandatory statutory declarations with deterministic Legal Metrology rules.'}
             </p>
+
+            {/* Mobile Inspection Mode Selector */}
+            <div className="inspection-mode-selector mobile-mode-selector" role="tablist" aria-label="Inspection Mode">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={isMultiProduct}
+                className={`mode-tab-btn ${isMultiProduct ? 'active' : ''}`}
+                onClick={() => onSetInspectionMode && onSetInspectionMode('MULTI_PRODUCT')}
+                id="btn-mobile-mode-multi-product"
+              >
+                <span className="mode-tab-icon">📦</span>
+                <span className="mode-tab-title">Multi-Product</span>
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={!isMultiProduct}
+                className={`mode-tab-btn ${!isMultiProduct ? 'active' : ''}`}
+                onClick={() => onSetInspectionMode && onSetInspectionMode('SINGLE_PRODUCT')}
+                id="btn-mobile-mode-single-product"
+              >
+                <span className="mode-tab-icon">📄</span>
+                <span className="mode-tab-title">Single Product</span>
+              </button>
+            </div>
           </section>
 
           {/* Central Visual Camera / Upload Hero Area */}
@@ -280,7 +369,7 @@ export default function HomeScreen({
             className={`scan-hub-card ${isDragging ? 'is-dragging' : ''}`}
             onClick={triggerCameraScan}
             onDragOver={handleDragOver}
-            onDragEnter={handleDragOver}
+            onDragEnter={handleDragEnter}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
           >
@@ -288,7 +377,13 @@ export default function HomeScreen({
               <div className="viewfinder-corners" />
               <div className="viewfinder-icon">{isDragging ? '📂' : '📷'}</div>
               <span className="viewfinder-label">
-                {isDragging ? 'Release to upload package panels' : 'Tap to Scan Principal Display Panel'}
+                {isDragging
+                  ? isMultiProduct
+                    ? 'Release to upload multiple product photos'
+                    : 'Release to upload package panels'
+                  : isMultiProduct
+                  ? 'Tap to Scan Product Photo'
+                  : 'Tap to Scan Principal Display Panel'}
               </span>
             </div>
 

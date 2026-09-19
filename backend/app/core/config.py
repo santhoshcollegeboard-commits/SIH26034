@@ -21,11 +21,11 @@ class Settings(BaseSettings):
     PROVIDER_COOLDOWN_SECONDS: int = 60
     OCR_PROVIDER: str = "gemini"  # Primary default ("gemini" | "groq")
     GEMINI_API_KEY: Optional[str] = None
-    GEMINI_MODEL: str = "gemini-3.8-flash"
-    GEMINI_MODELS: str = "gemini-3.8-flash,gemini-3.7-flash,gemini-3.6-flash,gemini-3.5-flash"
+    GEMINI_MODEL: str = "gemini-3.6-flash"
+    GEMINI_MODELS: str = "gemini-3.6-flash,gemini-3.8-flash,gemini-3.7-flash,gemini-3.5-flash"
     GROQ_API_KEY: Optional[str] = None
     GROQ_MODEL: str = "qwen/qwen3.8-27b"
-    GROQ_MODELS: str = "qwen/qwen3.8-27b,qwen/qwen3.6-27b"
+    GROQ_MODELS: str = "qwen/qwen3.8-27b"
 
     def get_gemini_models(self) -> list[str]:
         """Return ordered list of Gemini vision models, preferring GEMINI_MODEL if configured."""
@@ -37,7 +37,7 @@ class Settings(BaseSettings):
                 m = item.strip()
                 if m and m not in models:
                     models.append(m)
-        return models or ["gemini-3.8-flash"]
+        return models or ["gemini-3.6-flash"]
 
     def get_groq_models(self) -> list[str]:
         """Return ordered list of Groq vision models, preferring GROQ_MODEL if configured."""
@@ -51,8 +51,9 @@ class Settings(BaseSettings):
                     models.append(m)
         return models or ["qwen/qwen3.8-27b"]
 
-    # GTIN Product Identity Provider Configuration (Phase 2 & 2B)
-    GTIN_PROVIDER: str = "LOCAL_FIXTURE"  # "LOCAL_FIXTURE" | "OPEN_FOOD_FACTS"
+    # GTIN Product Identity Provider Configuration (Phase 2 & 2B & Controlled Prototype)
+    GTIN_PROVIDER: str = "LOCAL_CATALOG"  # "LOCAL_CATALOG" | "OPEN_FOOD_FACTS" | "LOCAL_FIXTURE"
+    LOCAL_CATALOG_PATH: str = "backend/data/products.json"
     OFF_API_BASE_URL: str = "https://world.openfoodfacts.org"
     OFF_TIMEOUT_SECONDS: float = 3.0
     OFF_USER_AGENT: str = "PackCheck - Web - Version 0.1.0 - https://github.com/packcheck"

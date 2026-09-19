@@ -39,12 +39,25 @@ from backend.app.schemas.gtin_identity import (
 from backend.app.services.gtin.providers import (
     GTINProvider,
     LocalFixtureGTINProvider,
+    set_gtin_provider,
 )
 from backend.app.services.gtin.reconciliation import (
     GTINReconciler,
     parse_canonical_quantity,
+    set_gtin_reconciler,
 )
 from backend.app.services.gtin.selector import select_gtin_candidate
+
+
+@pytest.fixture(autouse=True)
+def use_local_fixture_gtin_provider():
+    """Ensure Phase 2 tests run against the deterministic GS1 local fixture provider."""
+    set_gtin_provider(LocalFixtureGTINProvider())
+    set_gtin_reconciler(None)
+    yield
+    set_gtin_provider(None)
+    set_gtin_reconciler(None)
+
 
 
 # =============================================================================

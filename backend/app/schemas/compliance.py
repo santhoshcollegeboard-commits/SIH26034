@@ -9,6 +9,7 @@ from typing import List, Optional
 from pydantic import BaseModel, Field
 
 from backend.app.schemas.barcode import BarcodeSummary
+from backend.app.schemas.evidence import ProductEvidenceRecord
 from backend.app.schemas.gtin_identity import GTINIdentityVerification
 from backend.app.schemas.extraction import ExtractionResult, SourceRegion
 
@@ -87,6 +88,27 @@ class ComplianceResult(BaseModel):
     )
 
 
+
+class SingleProductResult(BaseModel):
+    """Independent verification result for a single packaged commodity."""
+
+    product_id: str = Field(..., description="Unique product identifier in this inspection (e.g., 'product_1')")
+    product_name: Optional[str] = Field(None, description="Identified product name")
+    gtin: Optional[str] = Field(None, description="Identified GTIN for this product")
+    success: bool = Field(True, description="Whether this product verification completed successfully")
+    extraction: Optional[ExtractionResult] = Field(None, description="Extracted label fields proposed by AI/OCR")
+    compliance: Optional[ComplianceResult] = Field(None, description="Deterministic rule engine compliance verdict")
+    error: Optional[str] = Field(None, description="Error message if this product failed")
+    model_used: Optional[str] = Field(None, description="AI/OCR model identifier used")
+    processing_time_ms: Optional[int] = Field(None, description="Pipeline execution time in ms")
+    image_count: Optional[int] = Field(1, description="Number of images/panels belonging to this product")
+    panel_labels: Optional[List[str]] = Field(None, description="Labels corresponding to panels of this product")
+    per_image_extractions: Optional[List[ExtractionResult]] = Field(None, description="Per-panel extractions")
+    barcode: Optional[BarcodeSummary] = Field(None, description="Decoded barcode(s) and local GTIN validation")
+    gtin_identity: Optional[GTINIdentityVerification] = Field(None, description="GTIN product identity reconciliation")
+    product_evidence: Optional[ProductEvidenceRecord] = Field(None, description="Matched product evidence image record")
+
+
 class VerificationResponse(BaseModel):
     """Composite API response for POST /api/verify."""
 
@@ -121,3 +143,16 @@ class VerificationResponse(BaseModel):
         None,
         description="Authoritative GTIN product identity and OCR reconciliation result (GTIN Phase 2)",
     )
+    product_evidence: Optional[ProductEvidenceRecord] = Field(
+        None,
+        description="Optional matched product evidence image and record based on identified GTIN",
+    )
+    inspection_mode: Optional[str] = Field(
+        "single_product",
+        description="Inspection mode: 'single_product' or 'multi_product'",
+    )
+    results: Optional[List[SingleProductResult]] = Field(
+        None,
+        description="Independent verification results for each product inspected in this session",
+    )
+

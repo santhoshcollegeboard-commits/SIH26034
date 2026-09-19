@@ -467,30 +467,28 @@ def test_15_default_model_priority_order():
     settings = Settings(
         GEMINI_API_KEY="test-gemini-key",
         GROQ_API_KEY="test-groq-key",
-        GEMINI_MODEL="gemini-3.8-flash",
-        GEMINI_MODELS="gemini-3.8-flash,gemini-3.7-flash,gemini-3.6-flash,gemini-3.5-flash",
+        GEMINI_MODEL="gemini-3.6-flash",
+        GEMINI_MODELS="gemini-3.6-flash,gemini-3.8-flash,gemini-3.7-flash,gemini-3.5-flash",
         GROQ_MODEL="qwen/qwen3.8-27b",
-        GROQ_MODELS="qwen/qwen3.8-27b,qwen/qwen3.6-27b",
+        GROQ_MODELS="qwen/qwen3.8-27b",
     )
     assert settings.get_gemini_models() == [
+        "gemini-3.6-flash",
         "gemini-3.8-flash",
         "gemini-3.7-flash",
-        "gemini-3.6-flash",
         "gemini-3.5-flash",
     ]
     assert settings.get_groq_models() == [
         "qwen/qwen3.8-27b",
-        "qwen/qwen3.6-27b",
     ]
 
     provider = ResilientFallbackOCRProvider(settings=settings)
     expected_chain = [
+        ("gemini", "gemini-3.6-flash"),
         ("gemini", "gemini-3.8-flash"),
         ("gemini", "gemini-3.7-flash"),
-        ("gemini", "gemini-3.6-flash"),
         ("gemini", "gemini-3.5-flash"),
         ("groq", "qwen/qwen3.8-27b"),
-        ("groq", "qwen/qwen3.6-27b"),
     ]
     actual_chain = [(c.provider_name, c.model_name) for c in provider.candidates]
     assert actual_chain == expected_chain

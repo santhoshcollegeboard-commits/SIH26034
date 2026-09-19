@@ -38,6 +38,7 @@ from backend.app.services.providers.gemini_provider import EXTRACTION_SYSTEM_PRO
 logger = logging.getLogger(__name__)
 
 DEFAULT_MODEL = "qwen/qwen3.8-27b"
+DEFAULT_REQUEST_TIMEOUT = 15.0
 
 
 class GroqOCRProvider(CloudOCRProvider):
@@ -47,9 +48,15 @@ class GroqOCRProvider(CloudOCRProvider):
     structured extraction results.
     """
 
-    def __init__(self, api_key: str, model_name: str | None = None) -> None:
+    def __init__(
+        self,
+        api_key: str,
+        model_name: str | None = None,
+        timeout: float = DEFAULT_REQUEST_TIMEOUT,
+    ) -> None:
         super().__init__(api_key=api_key, model_name=model_name or DEFAULT_MODEL)
-        self._client = groq.AsyncGroq(api_key=api_key)
+        self.timeout = timeout
+        self._client = groq.AsyncGroq(api_key=api_key, timeout=timeout)
 
     async def extract(self, image_data: bytes, mime_type: str) -> ExtractionResult:
         """Send image to Groq Vision and parse structured extraction result.
@@ -94,6 +101,7 @@ class GroqOCRProvider(CloudOCRProvider):
                 ],
                 response_format={"type": "json_object"},
                 temperature=0.1,
+                timeout=self.timeout,
             )
         except Exception as e:
             raw_msg = str(e)

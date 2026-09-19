@@ -205,3 +205,24 @@ async def test_extract_empty_response_raises_value_error(mock_client_cls):
     provider = GroqOCRProvider(api_key="fake-groq-key")
     with pytest.raises(ValueError, match="empty response choices"):
         await provider.extract(b"fake_image_bytes", "image/jpeg")
+
+
+@pytest.mark.asyncio
+@patch("backend.app.services.providers.groq_provider.groq.AsyncGroq")
+async def test_groq_timeout_is_applied(mock_client_cls):
+    """Explicit 15-second timeout is applied to AsyncGroq client and chat completion call."""
+    mock_client = MagicMock()
+    mock_client.chat.completions.create = AsyncMock(
+        return_value=_make_mock_response(VALID_GROQ_OUTPUT)
+    )
+    mock_client_cls.return_value = mock_client
+
+    provider = GroqOCRProvider(api_key="fake-groq-key")
+    assert provider.timeout == 15.0
+    mock_client_cls.assert_called_once_with(api_key="fake-groq-key", timeout=15.0)
+
+    await provider.extract(b"fake_image_bytes", "image/jpeg")
+
+    assert mock_client.chat.completions.create.called
+    call_kwargs = mock_client.chat.completions.create.call_args.kwargs
+    assert call_kwargs.get("timeout") == 15.0

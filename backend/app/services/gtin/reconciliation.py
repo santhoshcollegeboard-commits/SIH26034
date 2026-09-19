@@ -173,8 +173,14 @@ class GTINReconciler:
             Structured GTINIdentityVerification result.
         """
         # 1. Resolve candidate GTIN
+        is_local_catalog = self.provider.__class__.__name__ == "LocalCatalogProvider"
         is_off = self.provider.__class__.__name__ == "OpenFoodFactsProvider"
-        provider_name = "Open Food Facts" if is_off else "GS1 / DataKart"
+        if is_local_catalog:
+            provider_name = "Local Product Catalog (Prototype)"
+        elif is_off:
+            provider_name = "Open Food Facts"
+        else:
+            provider_name = "GS1 / DataKart"
 
         selection = select_gtin_candidate(barcode_summary)
 
@@ -207,13 +213,21 @@ class GTINReconciler:
             )
 
         if not product_record:
-            summary = (
-                f"GTIN {target_gtin} was not found in Open Food Facts. "
-                "Product identity could not be verified against the available product database."
-                if is_off
-                else f"GTIN {target_gtin} was not found in the authoritative product registry. "
-                "Cannot verify product identity against packaging declarations."
-            )
+            if is_local_catalog:
+                summary = (
+                    f"GTIN {target_gtin} was not found in the local prototype product catalog. "
+                    "Product identity could not be verified against the available product database."
+                )
+            elif is_off:
+                summary = (
+                    f"GTIN {target_gtin} was not found in Open Food Facts. "
+                    "Product identity could not be verified against the available product database."
+                )
+            else:
+                summary = (
+                    f"GTIN {target_gtin} was not found in the authoritative product registry. "
+                    "Cannot verify product identity against packaging declarations."
+                )
             return GTINIdentityVerification(
                 gtin=target_gtin,
                 lookup_status=GTINLookupStatus.NOT_FOUND,
@@ -238,11 +252,12 @@ class GTINReconciler:
         partials = [c for c in comparisons if c.status == FieldMatchStatus.PARTIAL_MATCH]
         comparables = [c for c in comparisons if c.status != FieldMatchStatus.NOT_COMPARABLE]
 
-        source_label = (
-            "Open Food Facts product record"
-            if (product_record.source and "Open Food Facts" in product_record.source)
-            else "authoritative product record"
-        )
+        if is_local_catalog or (product_record.source and ("Prototype Catalog" in product_record.source or "Local Product Catalog" in product_record.source)):
+            source_label = "local prototype product record"
+        elif is_off or (product_record.source and "Open Food Facts" in product_record.source):
+            source_label = "Open Food Facts product record"
+        else:
+            source_label = "authoritative product record"
 
         if not comparables:
             overall_status = IdentityVerificationStatus.NOT_VERIFIABLE
@@ -295,9 +310,20 @@ class GTINReconciler:
         ocr_generic = (extraction.common_or_generic_name.value or "").strip()
         gtin_name = (record.product_name or record.product_description or "").strip()
 
+        is_local_catalog = bool(
+            record.source and ("Prototype Catalog" in record.source or "Local Product Catalog" in record.source)
+        )
         is_off = bool(record.source and "Open Food Facts" in record.source)
-        source_record_label = "Open Food Facts record" if is_off else "Authoritative GTIN record"
-        source_ref_label = "Open Food Facts" if is_off else "registered record"
+        source_record_label = (
+            "Local catalog record" if is_local_catalog
+            else "Open Food Facts record" if is_off
+            else "Authoritative GTIN record"
+        )
+        source_ref_label = (
+            "local catalog record" if is_local_catalog
+            else "Open Food Facts" if is_off
+            else "registered record"
+        )
 
         if not ocr_name and not ocr_generic:
             return FieldComparison(
@@ -348,9 +374,16 @@ class GTINReconciler:
     ) -> FieldComparison:
         gtin_brand = (record.brand_name or "").strip()
         ocr_product = (extraction.product_name.value or "").strip()
+        is_local_catalog = bool(
+            record.source and ("Prototype Catalog" in record.source or "Local Product Catalog" in record.source)
+        )
         is_off = bool(record.source and "Open Food Facts" in record.source)
-        source_record_label = "Open Food Facts record" if is_off else "Authoritative GTIN record"
-        brand_prefix = "Brand" if is_off else "Registered brand"
+        source_record_label = (
+            "Local catalog record" if is_local_catalog
+            else "Open Food Facts record" if is_off
+            else "Authoritative GTIN record"
+        )
+        brand_prefix = "Brand" if (is_off or is_local_catalog) else "Registered brand"
 
         if not gtin_brand:
             return FieldComparison(
@@ -358,7 +391,7 @@ class GTINReconciler:
                 ocr_value=ocr_product or None,
                 gtin_value=None,
                 status=FieldMatchStatus.NOT_COMPARABLE,
-                message=f"{source_record_label} contains no brand name." if is_off else f"{source_record_label} contains no registered brand name.",
+                message=f"{source_record_label} contains no brand name." if (is_off or is_local_catalog) else f"{source_record_label} contains no registered brand name.",
             )
 
         if not ocr_product:
@@ -407,9 +440,20 @@ class GTINReconciler:
         gtin_qty_str = (record.net_quantity or "").strip()
         gtin_unit = (record.net_quantity_unit or "").strip()
 
+        is_local_catalog = bool(
+            record.source and ("Prototype Catalog" in record.source or "Local Product Catalog" in record.source)
+        )
         is_off = bool(record.source and "Open Food Facts" in record.source)
-        source_record_label = "Open Food Facts record" if is_off else "Authoritative GTIN record"
-        source_specifies = "Open Food Facts" if is_off else "registry"
+        source_record_label = (
+            "Local catalog record" if is_local_catalog
+            else "Open Food Facts record" if is_off
+            else "Authoritative GTIN record"
+        )
+        source_specifies = (
+            "local catalog" if is_local_catalog
+            else "Open Food Facts" if is_off
+            else "registry"
+        )
 
         if not ocr_qty_str:
             return FieldComparison(
@@ -476,10 +520,17 @@ class GTINReconciler:
     ) -> FieldComparison:
         ocr_mfg = (extraction.manufacturer_name.value or extraction.packer_name.value or "").strip()
         gtin_company = (record.company_name or "").strip()
+        is_local_catalog = bool(
+            record.source and ("Prototype Catalog" in record.source or "Local Product Catalog" in record.source)
+        )
         is_off = bool(record.source and "Open Food Facts" in record.source)
-        source_record_label = "Open Food Facts record" if is_off else "Authoritative GTIN record"
-        owner_ref = "brand owner" if is_off else "registered brand owner"
-        company_ref = "company" if is_off else "registered company"
+        source_record_label = (
+            "Local catalog record" if is_local_catalog
+            else "Open Food Facts record" if is_off
+            else "Authoritative GTIN record"
+        )
+        owner_ref = "manufacturer" if is_local_catalog else "brand owner" if is_off else "registered brand owner"
+        company_ref = "manufacturer" if is_local_catalog else "company" if is_off else "registered company"
 
         if not ocr_mfg:
             return FieldComparison(
@@ -496,7 +547,7 @@ class GTINReconciler:
                 ocr_value=ocr_mfg,
                 gtin_value=None,
                 status=FieldMatchStatus.NOT_COMPARABLE,
-                message=f"{source_record_label} contains no brand owner/company name." if is_off else f"{source_record_label} contains no registered company name.",
+                message=f"{source_record_label} contains no manufacturer name." if is_local_catalog else f"{source_record_label} contains no brand owner/company name." if is_off else f"{source_record_label} contains no registered company name.",
             )
 
         ocr_tokens = set(tokenize_text(ocr_mfg, remove_corp=True))

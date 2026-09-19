@@ -24,12 +24,17 @@ export default function ImagePreview({
   onReset,
   onRemovePanel,
   onUpdatePanelLabel,
+  onUpdateProductLabel,
   onAddMoreFiles,
+  inspectionMode = 'MULTI_PRODUCT',
+  onSetInspectionMode,
   loading = false,
   isPC = false,
 }) {
   const addFileInputRef = useRef(null);
   const addCameraInputRef = useRef(null);
+  const dragCounterRef = useRef(0);
+  const [isDragging, setIsDragging] = useState(false);
 
   // Normalize to panels array (supports backward-compatibility if single file passed)
   const displayPanels =
@@ -76,6 +81,44 @@ export default function ImagePreview({
     }
   };
 
+  const handleDragEnter = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current += 1;
+    if (e.dataTransfer?.items && e.dataTransfer.items.length > 0) {
+      setIsDragging(true);
+    }
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = 'copy';
+    }
+    if (!isDragging) setIsDragging(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current -= 1;
+    if (dragCounterRef.current <= 0) {
+      dragCounterRef.current = 0;
+      setIsDragging(false);
+    }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current = 0;
+    setIsDragging(false);
+    if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
+      handleMoreFiles(e.dataTransfer.files);
+    }
+  };
+
   const handlePrevPanel = () => {
     if (activeIndex > 0) {
       setSelectedPanelId(displayPanels[activeIndex - 1].id);
@@ -87,6 +130,8 @@ export default function ImagePreview({
       setSelectedPanelId(displayPanels[activeIndex + 1].id);
     }
   };
+
+  const isMulti = inspectionMode === 'MULTI_PRODUCT';
 
   return (
     <div className={`preview-screen multi-panel-preview ${isPC ? 'pc-preview-layout' : 'mobile-preview-layout'}`}>
@@ -121,31 +166,168 @@ export default function ImagePreview({
         <div className="pc-preview-container">
           <div className="pc-preview-header">
             <div className="header-title-col">
-              <h2 className="pc-preview-heading">Product Panel Inspection</h2>
+              <h2 className="pc-preview-heading">
+                {isMulti ? 'Multi-Product Batch Inspection' : 'Product Panel Inspection'}
+              </h2>
               <p className="pc-preview-sub">
-                Inspect high-resolution packaging declarations and verify panel types before compliance analysis.
+                {isMulti
+                  ? 'Inspect multiple distinct products in one session. Each product receives an independent Legal Metrology report and evidence image.'
+                  : 'Inspect high-resolution packaging declarations and verify panel types before compliance analysis.'}
               </p>
             </div>
             <div className="pc-header-actions">
+              {/* Inspection Mode Switcher */}
+              <div className="preview-mode-toggle" role="tablist" aria-label="Inspection Mode">
+                <button
+                  type="button"
+                  className={`preview-mode-btn ${isMulti ? 'active' : ''}`}
+                  onClick={() => onSetInspectionMode && onSetInspectionMode('MULTI_PRODUCT')}
+                  id="btn-preview-mode-multi"
+                >
+                  📦 Multi-Product
+                </button>
+                <button
+                  type="button"
+                  className={`preview-mode-btn ${!isMulti ? 'active' : ''}`}
+                  onClick={() => onSetInspectionMode && onSetInspectionMode('SINGLE_PRODUCT')}
+                  id="btn-preview-mode-single"
+                >
+                  📄 Multi-Panel
+                </button>
+              </div>
+
               <span className="panel-count-badge">
-                {displayPanels.length} {displayPanels.length === 1 ? 'Panel' : 'Panels'} Selected
+                {displayPanels.length} {displayPanels.length === 1 ? (isMulti ? 'Product' : 'Panel') : (isMulti ? 'Products' : 'Panels')} Selected
               </span>
             </div>
           </div>
 
           <div className="pc-preview-workstation-grid">
-            {/* Left Column: Focused Image Stage */}
+            {/* Left Column: Focused Image Stage & Multi-Product Drop Zone */}
             <div className="pc-preview-stage-col">
+              {/* If Multi-Product mode: display prominent active drop zone banner */}
+              {isMulti && (
+                <div
+                  className={`multi-product-dropzone-banner ${isDragging ? 'is-dragging' : ''}`}
+                  onDragEnter={handleDragEnter}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  onClick={() => addFileInputRef.current?.click()}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      addFileInputRef.current?.click();
+                    }
+                  }}
+                  aria-label="Drop additional product photos here or click to browse"
+                  id="multi-product-dropzone"
+                >
+                  <div className="multi-dropzone-inner">
+                    <span className="multi-dropzone-icon">{isDragging ? '📂' : '📦'}</span>
+                    <div className="multi-dropzone-info">
+                      <h4 className="multi-dropzone-title">
+                        {isDragging
+                          ? 'RELEASE TO ADD PRODUCT PHOTO'
+                          : 'DROP ADDITIONAL PRODUCT PHOTOS HERE'}
+                      </h4>
+                      <p className="multi-dropzone-sub">
+                        Drag & Drop or <span className="browse-link-text">Browse Files</span> &bull; Drop multiple products at any time
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn-secondary btn-compact multi-dropzone-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        addFileInputRef.current?.click();
+                      }}
+                      id="btn-multi-dropzone-browse"
+                    >
+                      📁 Browse Files
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* If Multi-Product mode: display horizontal product cards strip */}
+              {isMulti && displayPanels.length > 0 && (
+                <div className="pc-product-strip-container">
+                  <div className="pc-product-strip-header">
+                    <span className="pc-product-strip-label">
+                      Uploaded Products ({displayPanels.length}):
+                    </span>
+                    <span className="pc-product-strip-hint">
+                      Click a card to inspect its photo
+                    </span>
+                  </div>
+                  <div className="pc-product-cards-strip" role="tablist" aria-label="Uploaded Products">
+                    {displayPanels.map((p, idx) => {
+                      const isCurrent = p.id === activePanelId;
+                      const pName = p.productLabel || `Product ${idx + 1}`;
+                      return (
+                        <div
+                          key={p.id || idx}
+                          role="tab"
+                          aria-selected={isCurrent}
+                          className={`pc-product-strip-card ${isCurrent ? 'is-selected-product' : ''}`}
+                          onClick={() => setSelectedPanelId(p.id)}
+                          title={`Inspect ${pName}`}
+                        >
+                          <div className="product-strip-thumb-box">
+                            <img src={p.previewUrl} alt={pName} className="product-strip-img" />
+                            <span className="product-strip-index">#{idx + 1}</span>
+                            {onRemovePanel && (
+                              <button
+                                type="button"
+                                className="product-strip-remove-btn"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onRemovePanel(p.id);
+                                }}
+                                title={`Remove ${pName}`}
+                                aria-label={`Remove ${pName}`}
+                              >
+                                ✕
+                              </button>
+                            )}
+                          </div>
+                          <span className="product-strip-name" title={pName}>
+                            {pName}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {activePanel ? (
-                <div className="pc-large-image-card">
+                <div
+                  className={`pc-large-image-card ${isMulti && isDragging ? 'is-drag-target' : ''}`}
+                  onDragEnter={isMulti ? handleDragEnter : undefined}
+                  onDragOver={isMulti ? handleDragOver : undefined}
+                  onDragLeave={isMulti ? handleDragLeave : undefined}
+                  onDrop={isMulti ? handleDrop : undefined}
+                >
+                  {isMulti && isDragging && (
+                    <div className="stage-drag-overlay">
+                      <span className="stage-drag-icon">📦</span>
+                      <span className="stage-drag-text">Drop product image here to add</span>
+                    </div>
+                  )}
                   <div className="stage-top-meta">
                     <div className="stage-panel-headline">
-                      <span className="stage-pin-icon">📌</span>
+                      <span className="stage-pin-icon">{isMulti ? '📦' : '📌'}</span>
                       <h3 className="stage-panel-title">
-                        {activePanel.panelLabel || 'Package Panel'}
+                        {isMulti
+                          ? activePanel.productLabel || `Product ${activeIndex + 1}`
+                          : activePanel.panelLabel || 'Package Panel'}
                       </h3>
                       <span className="stage-pager-chip">
-                        Panel {activeIndex + 1} of {displayPanels.length}
+                        {isMulti ? 'Product' : 'Panel'} {activeIndex + 1} of {displayPanels.length}
                       </span>
                     </div>
 
@@ -173,7 +355,7 @@ export default function ImagePreview({
                   <div className="stage-image-viewport">
                     <img
                       src={activePanel.previewUrl}
-                      alt={`${activePanel.panelLabel || 'Panel'} full preview`}
+                      alt={`${(isMulti ? activePanel.productLabel : activePanel.panelLabel) || 'Panel'} full preview`}
                       className="stage-main-image"
                     />
 
@@ -185,8 +367,8 @@ export default function ImagePreview({
                           className="stage-nav-btn stage-nav-prev"
                           onClick={handlePrevPanel}
                           disabled={activeIndex === 0}
-                          title="Previous panel"
-                          aria-label="Previous panel"
+                          title="Previous item"
+                          aria-label="Previous item"
                         >
                           ‹
                         </button>
@@ -198,8 +380,8 @@ export default function ImagePreview({
                           className="stage-nav-btn stage-nav-next"
                           onClick={handleNextPanel}
                           disabled={activeIndex === displayPanels.length - 1}
-                          title="Next panel"
-                          aria-label="Next panel"
+                          title="Next item"
+                          aria-label="Next item"
                         >
                           ›
                         </button>
@@ -209,18 +391,20 @@ export default function ImagePreview({
                 </div>
               ) : (
                 <div className="pc-no-panel-selected">
-                  <p>No panel currently selected.</p>
+                  <p>No item currently selected.</p>
                 </div>
               )}
             </div>
 
-            {/* Right Column: Submitted Panels Sidebar (Fixed 340px) */}
-            <aside className="pc-preview-sidebar-col" aria-label="Submitted Panels Sidebar">
+            {/* Right Column: Submitted Panels / Products Sidebar (Fixed 340px) */}
+            <aside className="pc-preview-sidebar-col" aria-label="Submitted Items Sidebar">
               <div className="pc-panels-manager-card">
                 <div className="manager-header">
                   <div className="manager-title-row">
                     <h3 className="manager-title">
-                      {displayPanels.length > 1 ? 'Submitted Panels' : 'Panel Details'}
+                      {isMulti
+                        ? 'Products to Inspect'
+                        : displayPanels.length > 1 ? 'Submitted Panels' : 'Panel Details'}
                     </h3>
                     <span className="manager-count-tag">{displayPanels.length}</span>
                   </div>
@@ -230,36 +414,54 @@ export default function ImagePreview({
                       type="button"
                       className="pc-add-panel-btn-header"
                       onClick={() => addFileInputRef.current?.click()}
-                      title="Add another package panel"
+                      title={isMulti ? 'Add another product' : 'Add another package panel'}
                     >
                       + Add
                     </button>
                   )}
                 </div>
 
-                {/* When only 1 panel is selected, show details and controls without a duplicate image card */}
+                {/* When only 1 panel is selected */}
                 {displayPanels.length === 1 ? (
                   <div className="pc-single-panel-config">
-                    <div className="compact-select-wrap">
-                      <label htmlFor="pc-select-single" className="single-panel-select-label">
-                        Panel Type:
-                      </label>
-                      <select
-                        id="pc-select-single"
-                        className="compact-panel-select"
-                        value={activePanel?.panelLabel || PANEL_OPTIONS[0]}
-                        onChange={(e) =>
-                          onUpdatePanelLabel && onUpdatePanelLabel(activePanel.id, e.target.value)
-                        }
-                        aria-label="Panel type"
-                      >
-                        {PANEL_OPTIONS.map((opt) => (
-                          <option key={opt} value={opt}>
-                            {opt}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                    {isMulti ? (
+                      <div className="compact-select-wrap">
+                        <label htmlFor="pc-prod-input-single" className="single-panel-select-label">
+                          Product Name:
+                        </label>
+                        <input
+                          id="pc-prod-input-single"
+                          type="text"
+                          className="compact-text-input"
+                          value={activePanel?.productLabel || ''}
+                          placeholder="Product Name (e.g. Maggi, Cadbury)"
+                          onChange={(e) =>
+                            onUpdateProductLabel && onUpdateProductLabel(activePanel.id, e.target.value)
+                          }
+                        />
+                      </div>
+                    ) : (
+                      <div className="compact-select-wrap">
+                        <label htmlFor="pc-select-single" className="single-panel-select-label">
+                          Panel Type:
+                        </label>
+                        <select
+                          id="pc-select-single"
+                          className="compact-panel-select"
+                          value={activePanel?.panelLabel || PANEL_OPTIONS[0]}
+                          onChange={(e) =>
+                            onUpdatePanelLabel && onUpdatePanelLabel(activePanel.id, e.target.value)
+                          }
+                          aria-label="Panel type"
+                        >
+                          {PANEL_OPTIONS.map((opt) => (
+                            <option key={opt} value={opt}>
+                              {opt}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
 
                     <div className="compact-meta-row">
                       <span className="compact-filename" title={activePanel?.file?.name}>
@@ -281,7 +483,7 @@ export default function ImagePreview({
                     )}
                   </div>
                 ) : (
-                  /* Compact List of Panels (only rendered when > 1 panel to avoid duplicate single preview) */
+                  /* Compact List of Items */
                   <div className="pc-panel-items-list">
                     {displayPanels.map((panel, idx) => {
                       const isCurrent = panel.id === (activePanel?.id || displayPanels[0]?.id);
@@ -294,30 +496,45 @@ export default function ImagePreview({
                           <div className="compact-thumb-wrap">
                             <img
                               src={panel.previewUrl}
-                              alt={`${panel.panelLabel} thumbnail`}
+                              alt={`${panel.productLabel || panel.panelLabel} thumbnail`}
                               className="compact-thumb-img"
                             />
                             <span className="compact-idx-chip">#{idx + 1}</span>
                           </div>
 
                           <div className="compact-details-col" onClick={(e) => e.stopPropagation()}>
-                            <div className="compact-select-wrap">
-                              <select
-                                id={`pc-select-${idx}`}
-                                className="compact-panel-select"
-                                value={panel.panelLabel || PANEL_OPTIONS[0]}
-                                onChange={(e) =>
-                                  onUpdatePanelLabel && onUpdatePanelLabel(panel.id, e.target.value)
-                                }
-                                aria-label={`Panel ${idx + 1} type`}
-                              >
-                                {PANEL_OPTIONS.map((opt) => (
-                                  <option key={opt} value={opt}>
-                                    {opt}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
+                            {isMulti ? (
+                              <div className="compact-select-wrap">
+                                <input
+                                  id={`pc-prod-input-${idx}`}
+                                  type="text"
+                                  className="compact-text-input"
+                                  value={panel.productLabel || `Product ${idx + 1}`}
+                                  placeholder={`Product ${idx + 1}`}
+                                  onChange={(e) =>
+                                    onUpdateProductLabel && onUpdateProductLabel(panel.id, e.target.value)
+                                  }
+                                />
+                              </div>
+                            ) : (
+                              <div className="compact-select-wrap">
+                                <select
+                                  id={`pc-select-${idx}`}
+                                  className="compact-panel-select"
+                                  value={panel.panelLabel || PANEL_OPTIONS[0]}
+                                  onChange={(e) =>
+                                    onUpdatePanelLabel && onUpdatePanelLabel(panel.id, e.target.value)
+                                  }
+                                  aria-label={`Panel ${idx + 1} type`}
+                                >
+                                  {PANEL_OPTIONS.map((opt) => (
+                                    <option key={opt} value={opt}>
+                                      {opt}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            )}
 
                             <div className="compact-meta-row">
                               <span className="compact-filename" title={panel.file?.name}>
@@ -336,8 +553,8 @@ export default function ImagePreview({
                                 e.stopPropagation();
                                 onRemovePanel(panel.id);
                               }}
-                              title="Remove this panel"
-                              aria-label={`Remove panel ${idx + 1}`}
+                              title="Remove this item"
+                              aria-label={`Remove item ${idx + 1}`}
                             >
                               ✕
                             </button>
@@ -372,7 +589,9 @@ export default function ImagePreview({
                 <div className="pc-guideline-compact">
                   <span className="guideline-icon-compact">ℹ</span>
                   <p className="guideline-text-compact">
-                    {displayPanels.length > 1
+                    {isMulti
+                      ? 'Each product will be evaluated independently against Legal Metrology rules with its own GTIN identity and evidence image.'
+                      : displayPanels.length > 1
                       ? 'Declarations across all panels are aggregated. Conflicting values are flagged for inspector review.'
                       : 'Add other package sides to verify all mandatory Rule 6 declarations.'}
                   </p>
@@ -389,7 +608,9 @@ export default function ImagePreview({
                   >
                     <span className="btn-icon">⚡</span>
                     <span>
-                      Verify Product ({displayPanels.length} {displayPanels.length === 1 ? 'Panel' : 'Panels'})
+                      {isMulti
+                        ? `Verify ${displayPanels.length} ${displayPanels.length === 1 ? 'Product' : 'Independent Products'}`
+                        : `Verify Product (${displayPanels.length} ${displayPanels.length === 1 ? 'Panel' : 'Panels'})`}
                     </span>
                   </button>
 
@@ -413,24 +634,82 @@ export default function ImagePreview({
           {/* Screen Header */}
           <div className="preview-header">
             <div className="header-title-row">
-              <h3 className="preview-heading">Product Panels</h3>
+              <h3 className="preview-heading">
+                {isMulti ? 'Multi-Product Inspection' : 'Product Panels'}
+              </h3>
               <span className="panel-count-badge">
-                {displayPanels.length} {displayPanels.length === 1 ? 'Panel' : 'Panels'} Selected
+                {displayPanels.length} {displayPanels.length === 1 ? (isMulti ? 'Product' : 'Panel') : (isMulti ? 'Products' : 'Panels')} Selected
               </span>
             </div>
             <p className="preview-sub">
-              Verify declarations distributed across multiple sides of the packaging.
+              {isMulti
+                ? 'Each product will receive an independent statutory compliance report and evidence image.'
+                : 'Verify declarations distributed across multiple sides of the packaging.'}
             </p>
+
+            {/* Mobile Mode Switcher */}
+            <div className="inspection-mode-selector mobile-mode-selector" role="tablist" aria-label="Inspection Mode">
+              <button
+                type="button"
+                className={`mode-tab-btn ${isMulti ? 'active' : ''}`}
+                onClick={() => onSetInspectionMode && onSetInspectionMode('MULTI_PRODUCT')}
+              >
+                <span className="mode-tab-icon">📦</span>
+                <span className="mode-tab-title">Multi-Product</span>
+              </button>
+              <button
+                type="button"
+                className={`mode-tab-btn ${!isMulti ? 'active' : ''}`}
+                onClick={() => onSetInspectionMode && onSetInspectionMode('SINGLE_PRODUCT')}
+              >
+                <span className="mode-tab-icon">📄</span>
+                <span className="mode-tab-title">Single Product</span>
+              </button>
+            </div>
           </div>
 
-          {/* Multi-Panel Grid / Cards */}
+          {/* Mobile Dropzone for Multi-Product Mode */}
+          {isMulti && (
+            <div
+              className={`mobile-multi-dropzone ${isDragging ? 'is-dragging' : ''}`}
+              onDragEnter={handleDragEnter}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              onClick={() => addFileInputRef.current?.click()}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  addFileInputRef.current?.click();
+                }
+              }}
+              aria-label="Drop additional product photos here or tap to browse"
+              id="mobile-multi-dropzone"
+            >
+              <div className="mobile-dropzone-content">
+                <span className="mobile-dropzone-icon">{isDragging ? '📂' : '📦'}</span>
+                <div className="mobile-dropzone-text">
+                  <h4 className="mobile-dropzone-title">
+                    {isDragging ? 'RELEASE TO ADD PRODUCT' : 'DROP ADDITIONAL PRODUCT PHOTOS HERE'}
+                  </h4>
+                  <p className="mobile-dropzone-sub">
+                    Tap to Browse or Drag & Drop Product Photos
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Multi-Panel / Multi-Product Grid / Cards */}
           <div className="panels-grid">
             {displayPanels.map((panel, idx) => (
               <div key={panel.id || idx} className="panel-card">
                 <div className="panel-thumb-container">
                   <img
                     src={panel.previewUrl}
-                    alt={`${panel.panelLabel || 'Panel'} preview`}
+                    alt={`${(isMulti ? panel.productLabel : panel.panelLabel) || 'Item'} preview`}
                     className="panel-img"
                   />
                   <span className="panel-number-chip">#{idx + 1}</span>
@@ -440,8 +719,8 @@ export default function ImagePreview({
                       type="button"
                       className="btn-remove-panel"
                       onClick={() => onRemovePanel(panel.id)}
-                      title="Remove this panel"
-                      aria-label={`Remove panel ${idx + 1}`}
+                      title="Remove this item"
+                      aria-label={`Remove item ${idx + 1}`}
                       id={`btn-remove-panel-${idx}`}
                     >
                       ✕
@@ -452,27 +731,39 @@ export default function ImagePreview({
                 <div className="panel-controls">
                   <div className="panel-select-row">
                     <label htmlFor={`label-select-${idx}`} className="panel-select-label">
-                      Panel:
+                      {isMulti ? 'Product:' : 'Panel:'}
                     </label>
-                    <select
-                      id={`label-select-${idx}`}
-                      className="panel-label-select"
-                      value={panel.panelLabel || PANEL_OPTIONS[0]}
-                      onChange={(e) =>
-                        onUpdatePanelLabel && onUpdatePanelLabel(panel.id, e.target.value)
-                      }
-                    >
-                      {PANEL_OPTIONS.map((opt) => (
-                        <option key={opt} value={opt}>
-                          {opt}
-                        </option>
-                      ))}
-                    </select>
+                    {isMulti ? (
+                      <input
+                        id={`label-select-${idx}`}
+                        type="text"
+                        className="compact-text-input mobile-product-input"
+                        value={panel.productLabel || `Product ${idx + 1}`}
+                        onChange={(e) =>
+                          onUpdateProductLabel && onUpdateProductLabel(panel.id, e.target.value)
+                        }
+                      />
+                    ) : (
+                      <select
+                        id={`label-select-${idx}`}
+                        className="panel-label-select"
+                        value={panel.panelLabel || PANEL_OPTIONS[0]}
+                        onChange={(e) =>
+                          onUpdatePanelLabel && onUpdatePanelLabel(panel.id, e.target.value)
+                        }
+                      >
+                        {PANEL_OPTIONS.map((opt) => (
+                          <option key={opt} value={opt}>
+                            {opt}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                   </div>
 
                   <div className="panel-meta-row">
                     <span className="panel-filename" title={panel.file?.name}>
-                      {panel.file?.name || `Panel ${idx + 1}`}
+                      {panel.file?.name || `Item ${idx + 1}`}
                     </span>
                     <span className="panel-size">{formatFileSize(panel.file?.size)}</span>
                   </div>
@@ -491,19 +782,23 @@ export default function ImagePreview({
               </div>
             ))}
 
-            {/* Add More Panel Card */}
+            {/* Add More Item Card */}
             {displayPanels.length < 10 && (
               <div className="add-panel-card">
                 <div className="add-panel-content">
                   <span className="add-panel-icon">＋</span>
-                  <span className="add-panel-text">Add Another Panel</span>
-                  <span className="add-panel-hint">e.g. Back or Side</span>
+                  <span className="add-panel-text">
+                    {isMulti ? 'Add Another Product' : 'Add Another Panel'}
+                  </span>
+                  <span className="add-panel-hint">
+                    {isMulti ? 'Photo of different product' : 'e.g. Back or Side'}
+                  </span>
                   <div className="add-panel-actions">
                     <button
                       type="button"
                       className="btn-add-camera"
                       onClick={() => addCameraInputRef.current?.click()}
-                      title="Take photo of another panel"
+                      title="Take photo"
                     >
                       📷 Scan
                     </button>
@@ -525,7 +820,9 @@ export default function ImagePreview({
           <div className="guideline-callout">
             <span className="guideline-icon">ℹ</span>
             <p className="guideline-text">
-              {displayPanels.length > 1
+              {isMulti
+                ? 'Each product will be evaluated independently against Legal Metrology rules with its own GTIN identity and evidence image.'
+                : displayPanels.length > 1
                 ? 'Declarations from all panels will be aggregated into a single Legal Metrology verification. Any contradictory declarations will be flagged for review.'
                 : 'You can add other package sides (back, side) or proceed with this panel.'}
             </p>
@@ -542,7 +839,9 @@ export default function ImagePreview({
             >
               <span className="btn-icon">⚡</span>
               <span>
-                Verify Product ({displayPanels.length} {displayPanels.length === 1 ? 'Panel' : 'Panels'})
+                {isMulti
+                  ? `Verify ${displayPanels.length} ${displayPanels.length === 1 ? 'Product' : 'Independent Products'}`
+                  : `Verify Product (${displayPanels.length} ${displayPanels.length === 1 ? 'Panel' : 'Panels'})`}
               </span>
             </button>
 
