@@ -1,15 +1,53 @@
 import React, { useState } from 'react';
 
+function CameraIcon({ className = '', size = 16 }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
+      <circle cx="12" cy="13" r="3" />
+    </svg>
+  );
+}
+
+function FileTextIcon({ className = '', size = 16 }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+      <polyline points="14 2 14 8 20 8" />
+      <line x1="16" y1="13" x2="8" y2="13" />
+      <line x1="16" y1="17" x2="8" y2="17" />
+      <line x1="10" y1="9" x2="8" y2="9" />
+    </svg>
+  );
+}
+
 /**
  * ProductEvidenceViewer
  * 
- * Displays the verified product evidence image for the identified packaged commodity.
- * Data-driven and GTIN-based. Completely generic across all products.
- * 
- * Strict constraints:
- * - Single evidence image per product.
- * - Zero prototype / temporary wording.
- * - Zero product-specific hardcoding (e.g. no if-gtin checks).
+ * Displays verified product evidence imagery for the identified commodity.
+ * Generic across all products; data-driven from backend evidence service.
  */
 export default function ProductEvidenceViewer({ productEvidence }) {
   const [imageError, setImageError] = useState(false);
@@ -21,12 +59,14 @@ export default function ProductEvidenceViewer({ productEvidence }) {
   const hasEvidence = Boolean(evidenceImageUrl) && !imageError;
 
   return (
-    <div className="product-evidence-card">
+    <div className="product-evidence-card" aria-label="Product Packaging Evidence">
       <div className="product-evidence-header">
         <div className="evidence-header-left">
-          <span className="evidence-header-icon">📷</span>
+          <div className="evidence-icon-wrap">
+            <CameraIcon size={16} className="evidence-header-icon" />
+          </div>
           <div>
-            <h4 className="evidence-header-title">Product Evidence</h4>
+            <h4 className="evidence-header-title">Product Evidence Localization</h4>
             <span className="evidence-header-sub">
               {productName || (gtin ? `GTIN: ${gtin}` : 'Packaged Commodity')}
             </span>
@@ -50,9 +90,9 @@ export default function ProductEvidenceViewer({ productEvidence }) {
         ) : (
           <div className="evidence-empty-box">
             <div className="empty-icon-circle">
-              <span className="empty-icon">📋</span>
+              <FileTextIcon size={18} className="empty-icon" />
             </div>
-            <h5 className="empty-title">Evidence image not available for this product.</h5>
+            <h5 className="empty-title">Evidence image not available for this commodity.</h5>
             <p className="empty-desc">
               {gtin
                 ? `Standard verified evidence imagery is not currently indexed for GTIN ${gtin}.`

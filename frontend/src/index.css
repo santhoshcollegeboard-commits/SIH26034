@@ -1117,6 +1117,104 @@ html, body {
   padding-bottom: 24px;
 }
 
+/* ─── Executive Metrology Dossier Header ─── */
+.result-dossier-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding: 14px 20px;
+  background: #ffffff;
+  border: 1.5px solid var(--color-border-card);
+  border-radius: var(--radius-lg);
+  margin-bottom: 2px;
+  box-shadow: var(--shadow-subtle);
+}
+
+.dossier-header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dossier-act-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #1e40af;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  padding: 3px 8px;
+  border-radius: var(--radius-xs);
+  width: fit-content;
+}
+
+.dossier-shield-svg {
+  color: #2563eb;
+  flex-shrink: 0;
+}
+
+.dossier-title {
+  font-family: var(--font-heading);
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--color-brand-primary);
+  letter-spacing: -0.015em;
+  margin: 0;
+}
+
+.dossier-header-right {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.dossier-meta-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.dossier-meta-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+}
+
+.dossier-meta-val {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.dossier-id-mono {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: #0284c7;
+}
+
+@media (max-width: 640px) {
+  .result-dossier-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 14px;
+  }
+  .dossier-header-right {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .dossier-meta-item {
+    align-items: flex-start;
+  }
+}
+
 /* Prominent Verdict Banner */
 .verdict-banner {
   padding: 18px 24px;
@@ -1130,7 +1228,7 @@ html, body {
 .verdict-badge-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
 .verdict-icon {
@@ -1138,17 +1236,22 @@ html, body {
   line-height: 1;
   display: flex;
   align-items: center;
+  flex-shrink: 0;
+}
+
+.verdict-svg-icon {
+  flex-shrink: 0;
 }
 
 .verdict-title {
   font-family: var(--font-heading);
-  font-size: 1.45rem;
+  font-size: 1.35rem;
   font-weight: 800;
   letter-spacing: -0.02em;
 }
 
 .verdict-sub {
-  font-size: 0.95rem;
+  font-size: 0.94rem;
   line-height: 1.5;
   font-weight: 500;
 }
@@ -1167,6 +1270,7 @@ html, body {
   color: #065f46;
 }
 .verdict-banner.verdict-pass .verdict-title { color: #047857; }
+.verdict-banner.verdict-pass .verdict-svg-icon { color: #059669; }
 
 .verdict-banner.verdict-fail {
   background-color: #fef2f2;
@@ -1174,6 +1278,7 @@ html, body {
   color: #991b1b;
 }
 .verdict-banner.verdict-fail .verdict-title { color: #b91c1c; }
+.verdict-banner.verdict-fail .verdict-svg-icon { color: #dc2626; }
 
 .verdict-banner.verdict-review {
   background-color: #fffbeb;
@@ -1181,11 +1286,12 @@ html, body {
   color: #92400e;
 }
 .verdict-banner.verdict-review .verdict-title { color: #b45309; }
+.verdict-banner.verdict-review .verdict-svg-icon { color: #d97706; }
 
 /* Metrics Summary Grid */
 .metrics-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
   gap: 12px;
 }
 
@@ -1193,7 +1299,7 @@ html, body {
   background-color: #ffffff;
   border: 1px solid var(--color-border-card);
   border-radius: var(--radius-md);
-  padding: 12px 10px;
+  padding: 14px 12px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1202,6 +1308,26 @@ html, body {
   box-shadow: var(--shadow-subtle);
   transition: all 0.15s ease;
 }
+
+.metric-cell:hover {
+  border-color: #cbd5e1;
+  box-shadow: var(--shadow-card);
+}
+
+.metric-icon-val-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.metric-cell-icon {
+  flex-shrink: 0;
+}
+
+.metric-cell-icon.icon-pass { color: var(--color-pass-accent, #059669); }
+.metric-cell-icon.icon-fail { color: var(--color-fail-accent, #dc2626); }
+.metric-cell-icon.icon-review { color: var(--color-review-accent, #d97706); }
+.metric-cell-icon.icon-panels { color: var(--color-brand-accent, #2563eb); }
 
 .metric-val {
   font-family: var(--font-heading);
@@ -1212,7 +1338,7 @@ html, body {
 }
 
 .metric-lbl {
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -1224,6 +1350,7 @@ html, body {
 .cell-fail .metric-val { color: var(--color-fail-accent); }
 .cell-review .metric-val { color: var(--color-review-accent); }
 .cell-na .metric-val { color: var(--color-na-accent); }
+.cell-panels .metric-val { color: var(--color-brand-accent); }
 
 /* Package Snapshot Card */
 .package-snapshot-card {
@@ -4453,7 +4580,7 @@ html, body {
 
 .pc-result-workstation-grid {
   display: grid;
-  grid-template-columns: 420px 1fr;
+  grid-template-columns: 440px 1fr;
   gap: 24px;
   align-items: start;
 }
@@ -4461,11 +4588,12 @@ html, body {
 .pc-result-stage-col {
   position: sticky;
   top: 80px;
+  z-index: 10;
 }
 
 .pc-result-image-card {
   background: #ffffff;
-  border: 1px solid var(--color-border-card);
+  border: 1.5px solid var(--color-border-card);
   border-radius: var(--radius-md);
   padding: 16px;
   box-shadow: var(--shadow-card);
@@ -4476,6 +4604,7 @@ html, body {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 10px;
+  gap: 8px;
 }
 
 .pc-image-header-title {
@@ -4484,8 +4613,9 @@ html, body {
   gap: 6px;
 }
 
-.pc-header-icon {
-  font-size: 1rem;
+.pc-header-icon-svg {
+  color: var(--color-brand-accent, #2563eb);
+  flex-shrink: 0;
 }
 
 .pc-header-title-text {
@@ -4495,53 +4625,67 @@ html, body {
 }
 
 .pc-active-panel-tag {
-  font-size: 0.7rem;
+  font-size: 0.70rem;
   font-weight: 600;
   background: #eff6ff;
   color: #1e40af;
+  border: 1px solid #bfdbfe;
   padding: 2px 7px;
   border-radius: var(--radius-pill);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tag-pin-svg {
+  flex-shrink: 0;
 }
 
 .pc-filename-sub {
   font-size: 0.7rem;
   color: var(--color-text-muted);
-  font-family: monospace;
+  font-family: var(--font-mono);
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .pc-large-inspect-box {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background: #0b1120;
+  border: 1px solid #1e293b;
   border-radius: var(--radius-md);
-  height: 380px;
+  height: 390px;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 
 .pc-inspect-main-img {
-  max-width: 95%;
-  max-height: 350px;
+  max-width: 96%;
+  max-height: 370px;
   object-fit: contain;
   border-radius: 4px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
 }
 
 .pc-no-img-box {
-  color: #94a3b8;
-  font-size: 0.9rem;
+  color: #64748b;
+  font-size: 0.88rem;
 }
 
 .pc-snapshot-thumbs-strip {
-  margin: 12px 0 16px;
+  margin: 12px 0 14px;
 }
 
 .pc-thumbs-strip-title {
   display: block;
-  font-size: 0.76rem;
-  font-weight: 600;
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
   color: var(--color-text-secondary);
   margin-bottom: 8px;
 }
@@ -4574,18 +4718,18 @@ html, body {
 .pc-thumb-btn.is-selected-thumb {
   border-color: var(--color-brand-accent);
   background: #eff6ff;
-  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.12);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.15);
 }
 
 .pc-strip-thumb-img {
-  width: 54px;
-  height: 54px;
+  width: 56px;
+  height: 56px;
   object-fit: cover;
   border-radius: 4px;
 }
 
 .pc-strip-thumb-label {
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 600;
   color: var(--color-text-secondary);
   max-width: 68px;
@@ -4599,13 +4743,26 @@ html, body {
   border: 1px solid #e2e8f0;
   border-radius: var(--radius-md);
   padding: 14px;
-  margin-bottom: 16px;
+  margin-bottom: 14px;
+}
+
+.pc-commodity-header-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.pc-commodity-icon {
+  color: var(--color-brand-accent);
+  flex-shrink: 0;
 }
 
 .pc-commodity-name {
   font-size: 1.05rem;
   font-weight: 700;
   color: var(--color-text-primary);
+  margin: 0;
 }
 
 .pc-commodity-brand {
@@ -4623,11 +4780,30 @@ html, body {
 }
 
 .pc-stage-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   margin-top: 10px;
+}
+
+.pc-btn-download-report {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 
 .pc-btn-scan-another {
   width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn-icon-svg {
+  flex-shrink: 0;
 }
 
 .pc-result-audit-col {
@@ -4638,6 +4814,66 @@ html, body {
 
 .pc-review-notice {
   margin: 0;
+}
+
+.notice-warn-svg {
+  color: #d97706;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.tab-switch-icon {
+  flex-shrink: 0;
+}
+
+/* Product Error Isolated Presentation */
+.product-error-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.product-error-card {
+  background: #ffffff;
+  border: 1.5px solid #fecaca;
+  border-radius: var(--radius-lg);
+  padding: 32px 24px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  box-shadow: var(--shadow-card);
+}
+
+.product-error-icon {
+  color: #dc2626;
+  background: #fef2f2;
+  border-radius: 50%;
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.product-error-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #991b1b;
+  margin: 0;
+}
+
+.product-error-desc {
+  font-size: 0.90rem;
+  color: #64748b;
+  max-width: 540px;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.product-error-actions {
+  margin-top: 8px;
 }
 
 /* ─── Intermediate Breakpoints & Adaptations ─── */
