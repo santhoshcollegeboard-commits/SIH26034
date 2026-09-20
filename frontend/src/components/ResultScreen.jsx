@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import ComplianceChecklist from './ComplianceChecklist';
 import GTINIdentityCard from './GTINIdentityCard';
 import ProductEvidenceViewer from './ProductEvidenceViewer';
+import { downloadInspectionReportPdf } from '../services/pdfReportGenerator';
 
 /* ─── Executive Metrology SVG Icon Suite ─── */
 
@@ -432,7 +433,25 @@ export default function ResultScreen({
     extraction?.product_name?.value ||
     `Product ${safeProductIdx + 1}`;
 
-  const handleDownloadReport = () => {
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+
+  const handleDownloadPdf = async () => {
+    try {
+      setIsGeneratingPdf(true);
+      await downloadInspectionReportPdf({
+        verificationResponse,
+        products,
+        inspectionMode,
+        panels,
+      });
+    } catch (err) {
+      console.error('Failed to generate inspection report PDF:', err);
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
+  const handleDownloadJson = () => {
     const reportData = {
       report_title: 'PackCheck Legal Metrology Statutory Compliance Report',
       inspection_date: new Date().toISOString(),
@@ -879,11 +898,22 @@ export default function ResultScreen({
                     <button
                       type="button"
                       className="btn-primary btn-large pc-btn-download-report"
-                      onClick={handleDownloadReport}
+                      onClick={handleDownloadPdf}
+                      disabled={isGeneratingPdf}
                       id="btn-download-report"
                     >
                       <DownloadIcon size={16} className="btn-icon-svg" />
-                      <span>Download Inspection Report</span>
+                      <span>{isGeneratingPdf ? 'Generating PDF...' : 'DOWNLOAD PDF REPORT'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-secondary btn-large pc-btn-download-json"
+                      onClick={handleDownloadJson}
+                      id="btn-download-json"
+                      title="Download raw technical inspection data in JSON format"
+                    >
+                      <FileTextIcon size={15} className="btn-icon-svg" />
+                      <span>Download JSON</span>
                     </button>
                     <button
                       type="button"
@@ -1050,11 +1080,22 @@ export default function ResultScreen({
                 <button
                   type="button"
                   className="btn-primary btn-large"
-                  onClick={handleDownloadReport}
+                  onClick={handleDownloadPdf}
+                  disabled={isGeneratingPdf}
                   id="btn-mobile-download-report"
                 >
                   <DownloadIcon size={16} className="btn-icon-svg" />
-                  <span>Download Report</span>
+                  <span>{isGeneratingPdf ? 'Generating PDF...' : 'DOWNLOAD PDF REPORT'}</span>
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary btn-large"
+                  onClick={handleDownloadJson}
+                  id="btn-mobile-download-json"
+                  title="Download JSON technical export"
+                >
+                  <FileTextIcon size={15} className="btn-icon-svg" />
+                  <span>Download JSON</span>
                 </button>
                 <button
                   type="button"
