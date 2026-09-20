@@ -324,13 +324,13 @@ export default function App() {
       effectiveMode={effectiveMode}
       onSetModePreference={setModePreference}
     >
-      {/* Dev Mode View: Preserved /api/extract component */}
+      {/* Direct Extraction View: Preserved /api/extract component */}
       {viewMode === 'DEV_EXTRACT' ? (
         <div className="dev-mode-wrapper">
           <div className="dev-banner">
-            <span className="dev-tag">Developer Mode</span>
+            <span className="dev-tag">Direct Extraction Inspector</span>
             <p className="dev-desc">
-              Testing raw AI/OCR extraction endpoint (POST /api/extract) without statutory rule evaluation.
+              Direct multimodal OCR field extraction inspector without statutory rule evaluation.
             </p>
           </div>
           <ExtractTest />

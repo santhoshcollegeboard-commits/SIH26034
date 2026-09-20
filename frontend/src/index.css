@@ -2015,7 +2015,7 @@ html, body {
   line-height: 1.4;
 }
 
-/* ─── 8. Developer Mode Wrapper (ExtractTest Component) ─── */
+/* ─── 8. Direct Extraction Inspector (ExtractTest Component) ─── */
 .dev-mode-wrapper {
   display: flex;
   flex-direction: column;

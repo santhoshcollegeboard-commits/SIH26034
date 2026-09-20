@@ -4,7 +4,7 @@ import React from 'react';
  * Responsive device shell supporting both PC Workstation and Mobile views.
  * - In PC mode: Expands up to full desktop width (1440px) with workstation header.
  * - In Mobile mode: Centers inside a mobile device frame (~390-430px) with mobile topbar.
- * - Provides mode switcher: [ Auto (PC/Mob) ] [ 💻 PC ] [ 📱 Mobile ]
+ * - Provides mode switcher: [ Auto (PC/Mob) ] [ PC ] [ Mobile ]
  */
 export default function AppShell({
   children,
@@ -121,12 +121,12 @@ export default function AppShell({
               </span>
             </div>
 
-            {/* Dev Mode toggle to access preserved /api/extract test tool */}
+            {/* Diagnostics toggle to access preserved /api/extract test tool */}
             <button
               type="button"
               className="dev-mode-btn"
               onClick={onToggleViewMode}
-              title={viewMode === 'VERIFY' ? 'Switch to Raw Extraction Dev Tool' : 'Switch to Verification App'}
+              title={viewMode === 'VERIFY' ? 'Direct Field Extraction Inspector' : 'Compliance Inspection Workflow'}
               id="btn-toggle-dev-mode"
             >
               {viewMode === 'VERIFY' ? (
@@ -134,14 +134,14 @@ export default function AppShell({
                   <svg className="dev-icon-svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
                   </svg>
-                  <span>Dev</span>
+                  <span>Diagnostics</span>
                 </>
               ) : (
                 <>
                   <svg className="dev-icon-svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <polyline points="20 6 9 17 4 12" />
                   </svg>
-                  <span>Verify</span>
+                  <span>Inspection</span>
                 </>
               )}
             </button>

@@ -586,7 +586,7 @@ export default function ImagePreview({
                                   title={`Remove ${labelText}`}
                                   aria-label={`Remove ${labelText}`}
                                 >
-                                  ✕
+                                  <CrossIcon size={10} />
                                 </button>
                               )}
                             </div>
@@ -771,7 +771,7 @@ export default function ImagePreview({
                 <div className="pc-guarantee-note">
                   <ShieldCheckIcon size={14} className="pc-guarantee-icon" />
                   <p className="pc-guarantee-text">
-                    Statutory rules are 100% deterministic code &bull; Zero LLM compliance bias
+                    Deterministic legal verification engine &bull; Legal Metrology Rules, 2011
                   </p>
                 </div>
 

@@ -151,6 +151,28 @@ function ClockIcon({ className = '', size = 13 }) {
   );
 }
 
+function PackageBoxIcon({ className = '', size = 20 }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="m7.5 4.27 9 5.15" />
+      <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
+      <path d="m3.3 7 8.7 5 8.7-5" />
+      <line x1="12" y1="22" x2="12" y2="12" />
+    </svg>
+  );
+}
+
 /**
  * Optical Reticles for QC viewfinder cards
  */
@@ -310,7 +332,9 @@ export default function VerificationLoader({
                   {item.url ? (
                     <img src={item.url} alt={item.label} className="pc-scan-thumb-img" />
                   ) : (
-                    <div className="pc-scan-placeholder">📦</div>
+                    <div className="pc-scan-placeholder">
+                      <PackageBoxIcon size={22} className="placeholder-box-svg" />
+                    </div>
                   )}
                   <div className="pc-scan-overlay" />
                   <div className="pc-optical-sweep" />
@@ -384,7 +408,7 @@ export default function VerificationLoader({
           <div className="loader-guarantee pc-guarantee">
             <ShieldCheckIcon size={15} className="guarantee-shield-svg" />
             <span className="guarantee-text">
-              Zero LLM compliance bias &bull; Statutory rules are 100% deterministic code
+              Deterministic statutory compliance engine &bull; Legal Metrology Rules, 2011
             </span>
           </div>
         </div>
@@ -432,7 +456,7 @@ export default function VerificationLoader({
           <div className="loader-guarantee">
             <ShieldCheckIcon size={14} className="guarantee-shield-svg" />
             <span className="guarantee-text">
-              Zero LLM compliance bias &bull; Rules are 100% deterministic
+              Deterministic statutory compliance engine &bull; Legal Metrology Rules, 2011
             </span>
           </div>
         </div>
