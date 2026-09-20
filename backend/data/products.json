@@ -10,6 +10,17 @@
     "packer_name": null,
     "source": "PackCheck Controlled Prototype Catalog"
   },
+  "8901030997938": {
+    "gtin": "8901030997938",
+    "barcode_format": "EAN_13",
+    "product_name": "Dove Serum Beauty Bar",
+    "common_or_generic_name": "Serum Beauty Bar",
+    "brand": "Dove",
+    "net_quantity": "125 g",
+    "manufacturer_name": "Lakme Lever Pvt. Ltd.",
+    "packer_name": null,
+    "source": "PackCheck Controlled Prototype Catalog"
+  },
   "8901058000290": {
     "gtin": "8901058000290",
     "barcode_format": "EAN_13",

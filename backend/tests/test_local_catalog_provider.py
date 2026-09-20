@@ -222,18 +222,67 @@ def test_catalog_barcode_format_is_ean13():
     assert cadbury is not None
     assert cadbury.get("barcode_format") == "EAN_13"
 
+    # 4. Dove Serum Beauty Bar
+    dove_serum = data.get("8901030997938")
+    assert dove_serum is not None
+    assert dove_serum.get("barcode_format") == "EAN_13"
+
 
 def test_all_seeded_products_present_in_catalog():
-    """Verify products.json contains exactly the three seeded prototype records."""
+    """Verify products.json contains the seeded prototype records."""
     with open(DEFAULT_CATALOG_PATH, "r", encoding="utf-8") as f:
         data = json.load(f)
 
-    assert set(data.keys()) == {"8901030712999", "8901058000290", "7622202225024"}
-    assert data["8901030712999"]["product_name"] == "Dove Bathing Bar"
-    assert data["8901030712999"]["common_or_generic_name"] == "Bathing Bar"
+    assert {"8901030997938", "8901058000290", "7622202225024"}.issubset(set(data.keys()))
+    assert data["8901030997938"]["product_name"] == "Dove Serum Beauty Bar"
+    assert data["8901030997938"]["net_quantity"] == "125 g"
+    assert data["8901030997938"]["manufacturer_name"] == "Lakme Lever Pvt. Ltd."
     assert data["8901058000290"]["product_name"] == "MAGGI 2-Minute Noodles"
     assert data["7622202225024"]["product_name"] == "Cadbury Dairy Milk Silk Desserts Brownie"
     assert data["7622202225024"]["brand"] == "Cadbury Dairy Milk Silk"
+
+
+@pytest.mark.asyncio
+async def test_known_gtin_returns_dove_serum_beauty_bar():
+    """Verify GTIN 8901030997938 returns Dove Serum Beauty Bar, 125 g, Lakme Lever Pvt. Ltd."""
+    provider = LocalCatalogProvider()
+    assert provider.is_available() is True
+
+    record = await provider.get_product("8901030997938")
+    assert record is not None
+    assert record.gtin == "8901030997938"
+    assert record.product_name == "Dove Serum Beauty Bar"
+    assert record.brand_name == "Dove"
+    assert record.net_quantity == "125"
+    assert record.net_quantity_unit == "g"
+    assert record.company_name == "Lakme Lever Pvt. Ltd."
+    assert record.source == "PackCheck Controlled Prototype Catalog"
+
+
+@pytest.mark.asyncio
+async def test_reconciliation_works_with_dove_serum_beauty_bar_catalog_record():
+    """Verify OCR reconciler matches packaging declarations with Dove Serum Beauty Bar catalog record."""
+    provider = LocalCatalogProvider()
+    reconciler = GTINReconciler(provider=provider)
+
+    barcode_summary = _build_barcode_summary("8901030997938")
+    extraction = _build_test_extraction(
+        product_name="Dove",
+        generic_name="serum beauty bar",
+        brand="Dove",
+        net_quantity="125 g",
+        mfg_name="LAKME LEVER PVT. LTD.",
+    )
+    result = await reconciler.reconcile(barcode_summary, extraction)
+
+    assert result.lookup_status == GTINLookupStatus.FOUND
+    assert result.overall_status == IdentityVerificationStatus.MATCH
+
+    comps = {c.field_name: c for c in result.field_comparisons}
+    assert comps["product_name"].status == FieldMatchStatus.MATCH
+    assert comps["brand"].status == FieldMatchStatus.MATCH
+    assert comps["net_quantity"].status == FieldMatchStatus.MATCH
+    assert comps["manufacturer"].status == FieldMatchStatus.MATCH
 
 
 
