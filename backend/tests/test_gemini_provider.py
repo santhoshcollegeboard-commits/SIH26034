@@ -4,7 +4,7 @@ All tests mock the google-genai client — no real API calls or keys required.
 """
 
 import json
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -23,19 +23,19 @@ VALID_GEMINI_OUTPUT = json.dumps(
         "product_name": {
             "value": "Parle-G Biscuits",
             "confidence": 0.96,
-            "source_region": {"x": 50, "y": 30, "width": 250, "height": 45},
+            "source_region": [30, 50, 75, 300],
             "status": "extracted",
         },
         "manufacturer_name": {
             "value": "Parle Products Pvt. Ltd.",
             "confidence": 0.94,
-            "source_region": {"x": 40, "y": 180, "width": 300, "height": 30},
+            "source_region": [180, 40, 210, 340],
             "status": "extracted",
         },
         "manufacturer_address": {
             "value": "Vile Parle (E), Mumbai - 400057",
             "confidence": 0.89,
-            "source_region": {"x": 40, "y": 215, "width": 320, "height": 35},
+            "source_region": [215, 40, 250, 360],
             "status": "extracted",
         },
         "packer_name": {
@@ -52,28 +52,40 @@ VALID_GEMINI_OUTPUT = json.dumps(
         },
         "net_quantity": {
             "value": "800 g",
-            "confidence": 0.98,
-            "source_region": {"x": 120, "y": 280, "width": 100, "height": 50},
+            "confidence": 0.95,
+            "source_region": [600, 50, 640, 150],
             "status": "extracted",
         },
         "mrp": {
-            "value": "MRP ₹50.00",
-            "confidence": 0.95,
-            "source_region": {"x": 180, "y": 320, "width": 130, "height": 40},
+            "value": "MRP ₹150.00",
+            "confidence": 0.97,
+            "source_region": [640, 50, 680, 220],
             "status": "extracted",
         },
         "month_year_of_manufacture": {
-            "value": "Jul 2026",
-            "confidence": 0.82,
-            "source_region": {"x": 90, "y": 380, "width": 140, "height": 28},
+            "value": "10/2026",
+            "confidence": 0.92,
+            "source_region": [680, 50, 720, 150],
             "status": "extracted",
         },
         "consumer_care_details": {
             "value": None,
             "confidence": None,
-            "source_region": None,
+            "source_region": [800, 40, 850, 300],
             "status": "unreadable",
         },
+        "common_or_generic_name": {
+            "value": "Biscuits",
+            "confidence": 0.9,
+            "source_region": [75, 50, 100, 200],
+            "status": "extracted",
+        },
+        "country_of_origin": {
+            "value": "India",
+            "confidence": 0.88,
+            "source_region": [720, 50, 750, 150],
+            "status": "extracted",
+        }
     }
 )
 
@@ -93,10 +105,10 @@ async def test_extract_valid_response(mock_client_cls):
     assert result.product_name.status == "extracted"
     assert result.product_name.confidence == pytest.approx(0.96)
     assert result.product_name.source_region is not None
-    assert result.product_name.source_region.x == 50
+    assert result.product_name.source_region.x == pytest.approx(0.05)
 
     assert result.net_quantity.value == "800 g"
-    assert result.mrp.value == "MRP ₹50.00"
+    assert result.mrp.value == "MRP ₹150.00"
 
     assert result.packer_name.status == "not_found"
     assert result.packer_name.value is None
@@ -181,3 +193,22 @@ async def test_extract_handles_plain_string_fields(mock_client_cls):
     # Empty string should map to not_found
     assert result.net_quantity.value is None
     assert result.net_quantity.status == "not_found"
+
+
+@pytest.mark.asyncio
+@patch("backend.app.services.providers.gemini_provider.genai.Client")
+async def test_extract_native_async_client(mock_client_cls):
+    """Provider utilizes native async client when aio.models.generate_content is an async callable."""
+    mock_client = MagicMock()
+    mock_client.aio.models.generate_content = AsyncMock(
+        return_value=_make_mock_response(VALID_GEMINI_OUTPUT)
+    )
+    mock_client_cls.return_value = mock_client
+
+    provider = GeminiOCRProvider(api_key="test-key-not-real")
+    result = await provider.extract(b"\xff\xd8\xff\xe0" + b"\x00" * 50, "image/jpeg")
+
+    assert result.product_name.value == "Parle-G Biscuits"
+    assert result.product_name.status == "extracted"
+    mock_client.aio.models.generate_content.assert_awaited_once()
+

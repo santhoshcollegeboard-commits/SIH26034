@@ -4,6 +4,73 @@ from typing import Any, Dict
 from backend.app.schemas.extraction import ExtractionResult
 
 
+# =============================================================================
+# Typed OCR Exception Hierarchy
+# =============================================================================
+
+
+class OCRError(RuntimeError):
+    """Base exception for all OCR operations. Inherits from RuntimeError for backward compatibility."""
+
+    def __init__(
+        self,
+        message: str,
+        provider: str | None = None,
+        model: str | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.provider = provider
+        self.model = model
+
+
+class RecoverableOCRError(OCRError):
+    """Recoverable failures where attempting another model or provider is appropriate."""
+
+
+class ProviderQuotaExhaustedError(RecoverableOCRError):
+    """Quota or rate-limit exhaustion (e.g. HTTP 429, RESOURCE_EXHAUSTED)."""
+
+
+class ProviderRateLimitError(RecoverableOCRError):
+    """Temporary RPM/TPM limit exceeded."""
+
+
+class ProviderUnavailableError(RecoverableOCRError):
+    """Temporary service unavailability (500, 502, 503, 504, connection failures)."""
+
+
+class ProviderTimeoutError(RecoverableOCRError):
+    """Request or connection timeout."""
+
+
+class ModelNotFoundError(RecoverableOCRError):
+    """Requested model is deprecated, not found, or not supported by the provider."""
+
+
+class NonRecoverableOCRError(OCRError):
+    """Non-recoverable failures that should abort immediately rather than blindly falling back."""
+
+
+class AuthenticationError(NonRecoverableOCRError):
+    """Authentication or authorization failure (e.g. invalid API key)."""
+
+
+class InvalidInputError(NonRecoverableOCRError):
+    """Client-side input defect (e.g. empty bytes, unsupported payload)."""
+
+
+class AllProvidersExhaustedError(OCRError):
+    """Raised when every configured candidate provider and model in the fallback chain has failed."""
+
+    def __init__(
+        self,
+        message: str,
+        diagnostics: list[Dict[str, Any]] | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.diagnostics = diagnostics or []
+
+
 class OCRProvider(ABC):
     """Abstract base provider for optical character recognition & visual feature extraction.
 

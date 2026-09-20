@@ -1,0 +1,48 @@
+{
+  "8901030712999": {
+    "gtin": "8901030712999",
+    "barcode_format": "EAN_13",
+    "product_name": "Dove Bathing Bar",
+    "common_or_generic_name": "Bathing Bar",
+    "brand": "Dove",
+    "net_quantity": "50 g",
+    "manufacturer_name": "Hindustan Unilever Limited",
+    "packer_name": null,
+    "source": "PackCheck Controlled Prototype Catalog"
+  },
+  "8901030997938": {
+    "gtin": "8901030997938",
+    "barcode_format": "EAN_13",
+    "product_name": "Dove Serum Beauty Bar",
+    "common_or_generic_name": "Serum Beauty Bar",
+    "brand": "Dove",
+    "net_quantity": "125 g",
+    "manufacturer_name": "Lakme Lever Pvt. Ltd.",
+    "packer_name": null,
+    "source": "PackCheck Controlled Prototype Catalog"
+  },
+  "8901058000290": {
+    "gtin": "8901058000290",
+    "barcode_format": "EAN_13",
+    "product_name": "MAGGI 2-Minute Noodles",
+    "common_or_generic_name": "Masala Noodles",
+    "brand": "MAGGI",
+    "net_quantity": "70 g",
+    "manufacturer_name": "Nestlé India Limited",
+    "packer_name": null,
+    "source": "PackCheck Controlled Prototype Catalog"
+  },
+  "7622202225024": {
+    "gtin": "7622202225024",
+    "barcode_format": "EAN_13",
+    "product_name": "Cadbury Dairy Milk Silk Desserts Brownie",
+    "common_or_generic_name": "Milk Chocolate with Centre Filling",
+    "brand": "Cadbury Dairy Milk Silk",
+    "net_quantity": "70 g",
+    "manufacturer_name": "Mondelez India Foods Private Limited",
+    "packer_name": null,
+    "source": "PackCheck Controlled Prototype Catalog"
+  }
+}
+
+

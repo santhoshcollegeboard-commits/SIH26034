@@ -57,3 +57,7 @@ pnpm-debug.log*
 *~
 .DS_Store
 Thumbs.db
+
+# PackCheck Runtime Logs
+logs/*.log
+logs/*.log.*
