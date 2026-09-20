@@ -382,6 +382,8 @@ export default function App() {
               previewUrl={panels[0]?.previewUrl}
               previewUrls={panels.map((p) => p.previewUrl)}
               panelCount={panels.length}
+              panels={panels}
+              inspectionMode={inspectionMode}
               isPC={isPC}
               isMobile={isMobile}
               effectiveMode={effectiveMode}

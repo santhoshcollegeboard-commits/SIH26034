@@ -64,6 +64,24 @@ export default function ResultScreen({
   const naCount = compliance?.not_applicable_count ?? 0;
   const totalRules = compliance?.evaluations?.length ?? 9;
 
+  const effectiveGtin =
+    product_evidence?.gtin ||
+    currentProduct.gtin ||
+    gtin_identity?.product_record?.gtin ||
+    barcode?.primary_gtin;
+
+  const effectiveProductEvidence =
+    product_evidence ||
+    (effectiveGtin
+      ? {
+          gtin: effectiveGtin,
+          product_name:
+            gtin_identity?.product_record?.product_name ||
+            extraction?.product_name?.value ||
+            currentProduct.product_name,
+        }
+      : null);
+
   // Build list of thumbnails for current active product
   let displayThumbnails = [];
   if (isMultiProduct) {
@@ -93,6 +111,14 @@ export default function ResultScreen({
         },
       ];
     }
+
+    if (effectiveProductEvidence?.evidence_image) {
+      displayThumbnails.push({
+        url: effectiveProductEvidence.evidence_image,
+        label: 'Verified Localization',
+        filename: 'Statutory Fault Localization (Golden Reference)',
+      });
+    }
   } else {
     displayThumbnails =
       panels && panels.length > 0
@@ -106,10 +132,55 @@ export default function ResultScreen({
         : previewUrl
         ? [{ url: previewUrl, label: panel_labels?.[0] || 'PDP', filename: 'Principal Display Panel' }]
         : [];
+
+    if (effectiveProductEvidence?.evidence_image) {
+      displayThumbnails.push({
+        url: effectiveProductEvidence.evidence_image,
+        label: 'Verified Localization',
+        filename: 'Statutory Fault Localization (Golden Reference)',
+      });
+    }
   }
 
   const effectivePanelCount = image_count || displayThumbnails.length || 1;
   const activeInspectThumb = displayThumbnails[selectedThumbIdx] || displayThumbnails[0];
+
+  const displayedProductName =
+    currentProduct.product_name ||
+    extraction?.common_or_generic_name?.value ||
+    extraction?.product_name?.value ||
+    `Product ${safeProductIdx + 1}`;
+
+  const handleDownloadReport = () => {
+    const reportData = {
+      report_title: 'PackCheck Legal Metrology Statutory Compliance Report',
+      inspection_date: new Date().toISOString(),
+      product_id: currentProduct.product_id || `product_${safeProductIdx + 1}`,
+      product_name: displayedProductName,
+      gtin: effectiveGtin || 'Not Detected',
+      overall_verdict: verdict,
+      compliance_summary: compliance?.summary || '',
+      passed_count: passedCount,
+      failed_count: failedCount,
+      review_count: reviewCount,
+      exempt_count: naCount,
+      evaluations: compliance?.evaluations || [],
+      extracted_declarations: extraction || {},
+      product_evidence: effectiveProductEvidence || null,
+      processing_time_ms: processing_time_ms || null,
+      model_used: model_used || null,
+    };
+
+    const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `PackCheck_Inspection_Report_${effectiveGtin || safeProductIdx + 1}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   // Verdict Banner Configurations
   const verdictConfigs = {
@@ -227,24 +298,6 @@ export default function ResultScreen({
     </div>
   );
 
-  const effectiveGtin =
-    product_evidence?.gtin ||
-    currentProduct.gtin ||
-    gtin_identity?.product_record?.gtin ||
-    barcode?.primary_gtin;
-
-  const effectiveProductEvidence =
-    product_evidence ||
-    (effectiveGtin
-      ? {
-          gtin: effectiveGtin,
-          product_name:
-            gtin_identity?.product_record?.product_name ||
-            extraction?.product_name?.value ||
-            currentProduct.product_name,
-        }
-      : null);
-
   const renderEvidenceAndExtractions = () => (
     <div className="evidence-tab-stack">
       <ProductEvidenceViewer
@@ -254,12 +307,6 @@ export default function ResultScreen({
       {renderRawFieldsList()}
     </div>
   );
-
-  const displayedProductName =
-    currentProduct.product_name ||
-    extraction?.common_or_generic_name?.value ||
-    extraction?.product_name?.value ||
-    `Product ${safeProductIdx + 1}`;
 
   return (
     <div className={`result-screen ${isPC ? 'pc-result-layout' : 'mobile-result-layout'}`}>
@@ -492,8 +539,17 @@ export default function ResultScreen({
                     </div>
                   </div>
 
-                  {/* Reset / Scan Another Button */}
+                  {/* Actions Bar */}
                   <div className="pc-stage-actions">
+                    <button
+                      type="button"
+                      className="btn-secondary btn-large pc-btn-download-report"
+                      onClick={handleDownloadReport}
+                      id="btn-download-report"
+                    >
+                      <span className="btn-icon">📥</span>
+                      <span>Download Inspection Report</span>
+                    </button>
                     <button
                       type="button"
                       className="btn-primary btn-large pc-btn-scan-another"
@@ -652,6 +708,15 @@ export default function ResultScreen({
 
               {/* 7. Sticky Bottom Action */}
               <div className="result-sticky-footer">
+                <button
+                  type="button"
+                  className="btn-secondary btn-large"
+                  onClick={handleDownloadReport}
+                  id="btn-mobile-download-report"
+                >
+                  <span className="btn-icon">📥</span>
+                  <span>Download Report</span>
+                </button>
                 <button
                   type="button"
                   className="btn-primary btn-large"

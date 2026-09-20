@@ -38,99 +38,55 @@ export default function GTINIdentityCard({ gtinIdentity, barcode }) {
     return null;
   })();
 
-  const isLocalCatalog =
-    gtinIdentity?.provider_name === 'Local Product Catalog (Prototype)' ||
-    productRecord?.source === 'PackCheck Controlled Prototype Catalog' ||
-    gtinIdentity?.summary?.includes('local prototype product catalog') ||
-    gtinIdentity?.summary?.includes('local prototype product record');
-
-  const isOFF =
-    !isLocalCatalog &&
-    (gtinIdentity?.provider_name === 'Open Food Facts' ||
-      productRecord?.source === 'Open Food Facts' ||
-      gtinIdentity?.summary?.includes('Open Food Facts') ||
-      (gtinIdentity?.provider_name !== 'GS1 / DataKart' &&
-        productRecord?.source !== 'LOCAL_GS1_FIXTURE' &&
-        productRecord?.source !== 'GS1 India' &&
-        productRecord?.source !== 'DataKart'));
-
   // Status Badge Configuration
   const identityConfigs = {
     MATCH: {
-      label: 'IDENTITY MATCH',
+      label: 'GTIN MATCH',
       icon: '✓',
       badgeClass: 'gtin-badge-match',
       boxClass: 'gtin-box-match',
-      interpretation: isLocalCatalog
-        ? 'Packaging label declarations match the local prototype product record.'
-        : isOFF
-        ? 'Packaging label declarations match the Open Food Facts product record.'
-        : 'Packaging label declarations match the registered GS1 India / DataKart product identity.',
+      interpretation: 'Packaging declarations match the GTIN product data.',
     },
     PARTIAL_MATCH: {
       label: 'PARTIAL MATCH',
       icon: '≈',
       badgeClass: 'gtin-badge-partial',
       boxClass: 'gtin-box-partial',
-      interpretation: isLocalCatalog
-        ? 'Packaging declarations partially align with the local prototype product record. No direct contradictions detected.'
-        : isOFF
-        ? 'Packaging declarations partially align with the Open Food Facts product record. No direct contradictions detected.'
-        : 'Packaging declarations partially align with the registered GS1 India / DataKart record. No direct contradictions detected.',
+      interpretation:
+        'Packaging declarations partially match the GTIN product data. No direct contradictions detected.',
     },
     MISMATCH: {
       label: 'IDENTITY MISMATCH',
       icon: '≠',
       badgeClass: 'gtin-badge-mismatch',
       boxClass: 'gtin-box-mismatch',
-      interpretation: isLocalCatalog
-        ? 'Label information differs from the local prototype product record. Review recommended.'
-        : isOFF
-        ? 'Label information differs from the available Open Food Facts product record. Review recommended.'
-        : 'Label information differs from the available GS1 India / DataKart record. Review recommended.',
+      interpretation: 'Label declarations differ from the GTIN product data. Review recommended.',
     },
     NOT_VERIFIABLE: {
-      label: 'NOT VERIFIED',
+      label: 'GTIN NOT VERIFIED',
       icon: '—',
       badgeClass: 'gtin-badge-unverified',
       boxClass: 'gtin-box-unverified',
-      interpretation: isLocalCatalog
-        ? (lookupStatus === 'NOT_FOUND'
-            ? `GTIN ${targetGtin || 'barcode'} was not found in the local prototype product catalog. Product identity could not be verified against the available product database.`
-            : (gtinIdentity?.summary || 'Product identity could not be verified against the local product catalog.'))
-        : isOFF
-        ? (lookupStatus === 'NOT_FOUND'
-            ? `GTIN ${targetGtin || 'barcode'} was not found in Open Food Facts. Product identity could not be verified against the available product database.`
-            : (gtinIdentity?.summary || 'Product identity could not be verified against Open Food Facts.'))
-        : (gtinIdentity?.summary || 'Product identity could not be verified against an authoritative registry.'),
+      interpretation:
+        lookupStatus === 'SERVICE_UNAVAILABLE'
+          ? 'GTIN verification unavailable.'
+          : 'GTIN product data could not be verified.',
     },
   };
 
   const lookupLabels = {
     FOUND: {
-      text: isLocalCatalog
-        ? 'Found in Local Catalog'
-        : isOFF
-        ? 'Found in Open Food Facts'
-        : 'Registered in GS1 / DataKart',
-      icon: '📦',
+      text: 'GTIN Verified',
+      icon: '✓',
       class: 'lookup-pill-found',
     },
     NOT_FOUND: {
-      text: isLocalCatalog
-        ? 'Not in Local Catalog'
-        : isOFF
-        ? 'Not in Open Food Facts'
-        : 'Not in GS1 / DataKart Registry',
+      text: 'GTIN NOT VERIFIED',
       icon: '❓',
       class: 'lookup-pill-muted',
     },
     SERVICE_UNAVAILABLE: {
-      text: isLocalCatalog
-        ? 'Local Catalog Unavailable'
-        : isOFF
-        ? 'Open Food Facts Unavailable'
-        : 'Registry Service Unavailable',
+      text: 'GTIN verification unavailable.',
       icon: '⚡',
       class: 'lookup-pill-warn',
     },
@@ -164,19 +120,11 @@ export default function GTINIdentityCard({ gtinIdentity, barcode }) {
           <span className="gtin-card-icon">🏷️</span>
           <div className="gtin-header-titles">
             <h3 className="gtin-card-title">GTIN / Product Identity</h3>
-            <span className="gtin-sub-text">
-              {isLocalCatalog
-                ? 'Local Product Catalog (Prototype)'
-                : isOFF
-                ? 'Open Food Facts'
-                : 'GS1 India / DataKart Registry'}
-            </span>
           </div>
         </div>
         <span className={`gtin-status-pill ${currentConfig.badgeClass}`}>
           <span className="gtin-pill-icon">{currentConfig.icon}</span>
           <span className="gtin-pill-text">{currentConfig.label}</span>
-
         </span>
       </div>
 
@@ -194,7 +142,7 @@ export default function GTINIdentityCard({ gtinIdentity, barcode }) {
           </div>
         )}
 
-        {!(isLocalCatalog && lookupStatus === 'FOUND') && (
+        {lookupStatus !== 'FOUND' && (
           <div className={`gtin-lookup-pill ${currentLookup.class}`}>
             <span className="lookup-icon">{currentLookup.icon}</span>
             <span>{currentLookup.text}</span>
@@ -225,11 +173,6 @@ export default function GTINIdentityCard({ gtinIdentity, barcode }) {
               </strong>
             </div>
           </div>
-          {productRecord.source && (
-            <div className="gtin-source-row">
-              <span className="source-tag">Source: {productRecord.source}</span>
-            </div>
-          )}
         </div>
       )}
 
@@ -243,7 +186,7 @@ export default function GTINIdentityCard({ gtinIdentity, barcode }) {
             aria-expanded={showComparisons}
           >
             <span className="collapse-title">
-              Declaration vs {isLocalCatalog ? 'Local Catalog' : isOFF ? 'Open Food Facts' : 'Registry'} Reconciliation ({comparisons.length})
+              Declaration vs GTIN Data Reconciliation ({comparisons.length})
             </span>
             <span className="collapse-arrow">{showComparisons ? '▲' : '▼'}</span>
           </button>
@@ -253,9 +196,7 @@ export default function GTINIdentityCard({ gtinIdentity, barcode }) {
               <div className="comparisons-table-head">
                 <span className="col-field">Field</span>
                 <span className="col-label">Packaging Label</span>
-                <span className="col-registry">
-                  {isLocalCatalog ? 'Local Catalog Record' : isOFF ? 'Open Food Facts' : 'Registry Record'}
-                </span>
+                <span className="col-registry">GTIN Data</span>
                 <span className="col-status">Status</span>
               </div>
               {comparisons.map((c, idx) => {
